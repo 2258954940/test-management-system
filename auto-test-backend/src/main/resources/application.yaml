@@ -1,0 +1,31 @@
+server:
+  port: 8000
+  max-http-header-size: 32KB  
+spring:
+  application:
+    name: auto-test-backend
+  datasource:
+    url: jdbc:mysql://localhost:3306/auto_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  web:
+    resources:
+      static-locations: classpath:/static/,file:./screenshots/
+      add-mappings: true
+  # 新增：禁用 SpringBoot 的数据库初始化自动检测（解决 Mapper 解析冲突）
+  sql:
+    init:
+      mode: never
+
+# 原生 MyBatis 配置（适配你的 TestCaseMapper 注解写法）
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  type-aliases-package: com.auto.test.entity
+
+# 允许静态资源直接被访问，便于前端获取截图
+springdoc:
+  api-docs:
+    enabled: false

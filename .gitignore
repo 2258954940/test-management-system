@@ -1,0 +1,15 @@
+# 前端忽略（对应你的web-auto-test-frontend文件夹）
+web-auto-test-frontend/node_modules/
+web-auto-test-frontend/dist/
+web-auto-test-frontend/.env
+web-auto-test-frontend/.env.*
+web-auto-test-frontend/.vscode/
+
+# 后端忽略（对应你的auto-test-backend文件夹）
+auto-test-backend/target/
+auto-test-backend/.idea/
+auto-test-backend/.env
+
+# 通用忽略文件
+*.log
+.DS_Store
