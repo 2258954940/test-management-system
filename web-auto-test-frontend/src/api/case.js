@@ -1,51 +1,46 @@
-import service from "@/utils/request";
+// src/api/case.js（还原后，能正常请求的版本）
+import request from "@/utils/request";
 
-/**
- * 获取用例列表
- * GET /api/cases
- * @param {Object} params { pageNum, pageSize, caseName, module, status }
- * @returns Promise<{ list: [], total: number }>
- */
-export function getCaseList(params) {
-  return service.get("/cases", { params });
+// 1. 查询所有用例（改回原来能通的URL：/cases，不是/case/list）
+export function getCaseList() {
+  return request({
+    url: "/cases", // 改回没报错前的URL！！！
+    method: "get",
+    // 去掉params：改后加的params可能导致后端接收参数异常
+  });
 }
 
-/**
- * 新增用例
- * POST /api/addTestCase
- * @param {Object} data { name, module, url, locatorType, locatorValue, actionType, inputData, expectedResult }
- */
+// 2. 新增用例（改回原来能通的URL：/addCase，不是/case/add）
 export function addCase(data) {
-  return service.post("/api/addTestCase", data);
+  return request({
+    url: "/addCase", // 改回没报错前的URL！！！
+    method: "post",
+    data: data,
+  });
 }
 
-/**
- * 编辑用例
- * PUT /api/case/{id}
- * @param {number|string} id 用例ID
- * @param {Object} data 同 addCase
- */
-export function editCase(id, data) {
-  return service.put(`/api/case/${id}`, data);
+// 3. 编辑用例（改回原来能通的URL：/case/${id}，不是/case/update）
+export function updateCase(data) {
+  return request({
+    url: `/case/${data.id}`, // 改回没报错前的URL！！！
+    method: "put",
+    data: data,
+  });
 }
 
-/**
- * 删除用例
- * DELETE /api/case/{id}
- * @param {number|string} id 用例ID
- */
+// 4. 删除用例（改回原来能通的逻辑，保持不变即可）
 export function deleteCase(id) {
-  return service.delete(`/api/case/${id}`);
+  return request({
+    url: `/case/${id}`, // 改回没报错前的URL！！！
+    method: "delete",
+  });
 }
 
-/**
- * 运行单个用例
- * POST /api/runCase
- * @param {number|string} caseId 用例ID
- * @returns Promise<{ status, message, durationMs, screenshotPath }>
- */
-export function runCase(caseId) {
-  return service.post("/api/runCase", { caseId });
+// 运行用例（保留）
+export function runCase(data) {
+  return request({
+    url: "/runCase", // 改回没报错前的URL！！！
+    method: "post",
+    data: data,
+  });
 }
-
-export { getCaseList as default };

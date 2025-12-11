@@ -25,17 +25,26 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            // 1. 先配置CORS（必须在csrf之前，否则跨域会被拦截）
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            // 2. 禁用CSRF（前后端分离场景必做）
             .csrf(csrf -> csrf.disable())
+            // 3. 禁用表单登录/HTTP Basic（前后端分离用JWT）
             .formLogin(form -> form.disable())
             .httpBasic(basic -> basic.disable())
+            // 4. 权限规则：精准放行登录接口，其他接口需认证
             .authorizeHttpRequests(auth -> auth
+                // 核心：放行登录接口（重点检查路径是否和前端一致）
+                // 若后端配置了server.servlet.context-path=/api → 这里写 /user/login
+                // 若后端无context-path → 这里写 /api/user/login
                 .requestMatchers("/api/user/login").permitAll()
-                .requestMatchers("/api/cases/**").permitAll()
-                // 调整：hasRole会自动加ROLE_前缀，数据库role是"admin"的话，用hasAuthority更准确
+                // 放行用例相关接口（开发环境临时用，生产需收窄）
+                .requestMatchers("/api/cases", "/api/addCase", "/api/case/**", "/api/runCase").permitAll()
+                // 系统用户接口仅admin可访问
                 .requestMatchers("/api/system/user/**").hasAuthority("admin")
+                // 其他所有接口需认证
                 .anyRequest().authenticated()
-            )
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()));
+            );
 
         return http.build();
     }
@@ -43,14 +52,21 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // 调整：Spring6.x推荐用addAllowedOriginPattern，避免浏览器CORS限制
+        // 关键：Spring6.x推荐用addAllowedOriginPattern，兼容浏览器CORS限制
         config.addAllowedOriginPattern("http://localhost:8080");
+        // 允许带凭证（Cookie/Token）
         config.setAllowCredentials(true);
+        // 允许所有请求方法
         config.addAllowedMethod("*");
+        // 允许所有请求头
         config.addAllowedHeader("*");
+        // 暴露Authorization头（前端可获取）
+        config.addExposedHeader("Authorization");
+        // 缓存CORS配置1小时
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // 对所有路径应用CORS配置
         source.registerCorsConfiguration("/**", config);
         return source;
     }

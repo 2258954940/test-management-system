@@ -14,6 +14,8 @@ module.exports = {
   ],
   parserOptions: {
     parser: "@babel/eslint-parser",
+    requireConfigFile: false, // 新增：禁用Babel config检测（解决核心报错）
+    sourceType: "module", // 新增：解决CommonJS/ES模块格式提示
   },
   rules: {
     "no-console": process.env.NODE_ENV === "production" ? "warn" : "off",
