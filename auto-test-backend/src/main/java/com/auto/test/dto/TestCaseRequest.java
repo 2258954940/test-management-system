@@ -11,25 +11,37 @@ public class TestCaseRequest {
     @NotBlank(message = "用例名称不能为空")
     private String name;
 
-    private String description;
+    private String description; // 前端传了，非必填
 
     @NotBlank(message = "访问地址不能为空")
     private String url;
 
-    @NotBlank(message = "定位方式不能为空")
+    // 暂时去掉必填校验（前端还没做这些字段的输入框）
     private String locatorType;
 
-    @NotBlank(message = "定位值不能为空")
     private String locatorValue;
 
-    @NotBlank(message = "动作类型不能为空")
     private String actionType;
 
     private String inputData;
 
-    @NotNull(message = "期望结果不能为空")
+    // 暂时去掉必填校验（前端还没做）
     private String expectedResult;
 
+    // 新增：接收前端传的creator字段
+    @NotBlank(message = "创建人不能为空")
+    private String creator;
+
+    // ========== 补充creator的getter/setter ==========
+    public String getCreator() {
+        return creator;
+    }
+
+    public void setCreator(String creator) {
+        this.creator = creator;
+    }
+
+    // ========== 原有字段的getter/setter保留 ==========
     public String getName() {
         return name;
     }

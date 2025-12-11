@@ -1,37 +1,36 @@
-// src/api/case.js（还原后，能正常请求的版本）
+// src/api/case.js 修正后：
 import request from "@/utils/request";
 
-// 1. 查询所有用例（改回原来能通的URL：/cases，不是/case/list）
+// 1. 查询所有用例（后端接口：/api/cases）
 export function getCaseList() {
   return request({
-    url: "/cases", // 改回没报错前的URL！！！
+    url: "/cases", // 最终请求：/api/cases（与后端一致）
     method: "get",
-    // 去掉params：改后加的params可能导致后端接收参数异常
   });
 }
 
-// 2. 新增用例（改回原来能通的URL：/addCase，不是/case/add）
+// 2. 新增用例（后端接口：/api/addCase）
 export function addCase(data) {
   return request({
-    url: "/addCase", // 改回没报错前的URL！！！
+    url: "/addCase", // 最终请求：/api/addCase（与后端一致）
     method: "post",
     data: data,
   });
 }
 
-// 3. 编辑用例（改回原来能通的URL：/case/${id}，不是/case/update）
+// 3. 编辑用例（后端接口：/api/case/{id}）
 export function updateCase(data) {
   return request({
-    url: `/case/${data.id}`, // 改回没报错前的URL！！！
+    url: `/case/${data.id}`, // 最终请求：/api/case/{id}（与后端一致）
     method: "put",
     data: data,
   });
 }
 
-// 4. 删除用例（改回原来能通的逻辑，保持不变即可）
+// 4. 删除用例（已正确）
 export function deleteCase(id) {
   return request({
-    url: `/case/${id}`, // 改回没报错前的URL！！！
+    url: `/case/${id}`,
     method: "delete",
   });
 }

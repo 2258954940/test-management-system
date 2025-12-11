@@ -59,10 +59,10 @@
     />
 
     <el-dialog
-      v-model:visible="dialogVisible"
+      v-model="dialogVisible"
       :title="dialogTitle"
       width="560px"
-      destroy-on-close
+      style="z-index: 9999"
     >
       <el-form
         ref="formRef"
@@ -108,7 +108,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import CommonQueryForm from "@/components/CommonQueryForm.vue";
 import CommonPagination from "@/components/CommonPagination.vue";
@@ -251,25 +251,42 @@ const formRules = {
 const dialogTitle = computed(() => (isEdit.value ? "编辑用例" : "新增用例"));
 
 function openAdd() {
+  // ① 重置表单（和系统管理一致）
   isEdit.value = false;
   formModel.id = null;
   formModel.name = "";
   formModel.url = "";
   formModel.description = "";
-  formModel.creator = getDefaultCreator();
+  formModel.creator = "admin"; // 先固定值，避开getDefaultCreator的依赖
+
+  // ② 直接显示弹窗（和系统管理一致）
   dialogVisible.value = true;
-  nextTick(() => formRef.value?.clearValidate());
+  // ③ 延迟清验证（等弹窗渲染完，和系统管理一致）
+  setTimeout(() => {
+    if (formRef.value) formRef.value.clearValidate();
+  }, 100);
+  console.log("dialogVisible设置为：", dialogVisible.value);
 }
 
 function openEdit(row) {
+  console.log("点击了编辑按钮，执行openEdit，行数据：", row);
+  // ① 重置编辑状态+赋值
   isEdit.value = true;
   formModel.id = row.id;
   formModel.name = row.name || "";
   formModel.url = row.url || "";
   formModel.description = row.description || "";
-  formModel.creator = row.creator || getDefaultCreator();
+  formModel.creator = row.creator || "admin"; // 固定值，避开依赖
+
+  // ② 直接显示弹窗（和系统管理/新增按钮一致）
   dialogVisible.value = true;
-  nextTick(() => formRef.value?.clearValidate());
+
+  // ③ 延迟清验证（等弹窗渲染完）
+  setTimeout(() => {
+    if (formRef.value) formRef.value.clearValidate();
+  }, 100);
+
+  console.log("dialogVisible设置为：", dialogVisible.value);
 }
 
 async function handleSubmit() {
@@ -277,6 +294,8 @@ async function handleSubmit() {
   try {
     await formRef.value.validate();
   } catch (err) {
+    // 新增：验证失败时明确提示用户
+    ElMessage.error("请填写所有必填字段（用例名称/URL/步骤/创建人）");
     return;
   }
 

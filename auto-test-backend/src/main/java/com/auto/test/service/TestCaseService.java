@@ -44,11 +44,12 @@ public class TestCaseService {
         testCase.setName(request.getName());
         testCase.setDescription(request.getDescription());
         testCase.setUrl(request.getUrl());
-        testCase.setLocatorType(request.getLocatorType());
-        testCase.setLocatorValue(request.getLocatorValue());
-        testCase.setActionType(request.getActionType());
-        testCase.setInputData(request.getInputData());
-        testCase.setExpectedResult(request.getExpectedResult());
+    // 核心修复：给数据库非空字段加默认值，避开NOT NULL约束
+    testCase.setLocatorType(request.getLocatorType() != null ? request.getLocatorType() : "id"); // 默认值
+    testCase.setLocatorValue(request.getLocatorValue() != null ? request.getLocatorValue() : "");
+    testCase.setActionType(request.getActionType() != null ? request.getActionType() : "click"); // 默认值
+    testCase.setInputData(request.getInputData() != null ? request.getInputData() : "");
+    testCase.setExpectedResult(request.getExpectedResult() != null ? request.getExpectedResult() : "");
         testCaseMapper.insertTestCase(testCase);
         return testCase;
     }
