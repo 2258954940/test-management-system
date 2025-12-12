@@ -27,17 +27,18 @@
         min-width="200"
         show-overflow-tooltip
       />
+
       <el-table-column prop="creator" label="创建人" width="120" />
-      <el-table-column prop="create_time" label="创建时间" width="180">
-        <template #default="{ row }">{{
-          formatDate(row.create_time)
-        }}</template>
+
+      <el-table-column prop="createTime" label="创建时间" width="180">
+        <template #default="{ row }">{{ formatDate(row.createTime) }}</template>
       </el-table-column>
-      <el-table-column prop="update_time" label="更新时间" width="180">
-        <template #default="{ row }">{{
-          formatDate(row.update_time)
-        }}</template>
+
+      <el-table-column prop="updateTime" label="更新时间" width="180">
+        <template #default="{ row }">{{ formatDate(row.updateTime) }}</template>
       </el-table-column>
+      <!-- 临时修改：直接显示原始值，不格式化 -->
+
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <el-button type="text" size="small" @click="openEdit(row)"
@@ -344,6 +345,7 @@ function handleDelete(id) {
 
 function formatDate(val) {
   if (!val) return "";
+  val = typeof val === "string" ? val.replace("T", " ") : val;
   const d = new Date(val);
   if (Number.isNaN(d.getTime())) return val;
   const y = d.getFullYear();

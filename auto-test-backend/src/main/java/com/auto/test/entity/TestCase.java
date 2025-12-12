@@ -17,7 +17,21 @@ public class TestCase {
     private String inputData;
     private String expectedResult;
     private LocalDateTime createTime;
-
+    private String creator; // 新增
+    private LocalDateTime updateTime;
+        public LocalDateTime getUpdateTime() {
+            return updateTime;
+        }
+        public void setUpdateTime(LocalDateTime updateTime) {
+            this.updateTime = updateTime;
+        }
+        // 新增getter/setter
+        public String getCreator() {
+            return creator;
+        }
+        public void setCreator(String creator) {
+            this.creator = creator;
+        }
     public Long getId() {
         return id;
     }

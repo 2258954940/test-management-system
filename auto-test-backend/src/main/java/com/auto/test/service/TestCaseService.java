@@ -146,18 +146,29 @@ public class TestCaseService {
     /**
      * 更新指定测试用例，若不存在则抛出非法参数异常。
      */
-    @Transactional
-    public void updateTestCase(Long id, TestCase payload) {
-        TestCase exists = testCaseMapper.findById(id);
-        if (exists == null) {
-            throw new IllegalArgumentException("用例不存在，ID=" + id);
-        }
-        payload.setId(id);
-        int updated = testCaseMapper.updateTestCase(payload);
-        if (updated == 0) {
-            throw new IllegalStateException("更新失败，未影响任何行");
-        }
+public void updateTestCase(Long id, TestCase request) {
+    // 1. 先查询原用例（获取原有的locator_type等非空字段值）
+    TestCase originalCase = testCaseMapper.findById(id);
+    if (originalCase == null) {
+        throw new IllegalArgumentException("用例不存在");
     }
+
+    // 2. 赋值：只更新前端传了的字段，没传的保留原数据（避免空值覆盖）
+    originalCase.setName(request.getName() != null ? request.getName() : originalCase.getName());
+    originalCase.setDescription(request.getDescription() != null ? request.getDescription() : originalCase.getDescription());
+    originalCase.setUrl(request.getUrl() != null ? request.getUrl() : originalCase.getUrl());
+    originalCase.setCreator(request.getCreator() != null ? request.getCreator() : originalCase.getCreator());
+    
+    // 核心：locator_type等非空字段，前端没传就用原数据（避免空值）
+    originalCase.setLocatorType(request.getLocatorType() != null ? request.getLocatorType() : originalCase.getLocatorType());
+    originalCase.setLocatorValue(request.getLocatorValue() != null ? request.getLocatorValue() : originalCase.getLocatorValue());
+    originalCase.setActionType(request.getActionType() != null ? request.getActionType() : originalCase.getActionType());
+    originalCase.setInputData(request.getInputData() != null ? request.getInputData() : originalCase.getInputData());
+    originalCase.setExpectedResult(request.getExpectedResult() != null ? request.getExpectedResult() : originalCase.getExpectedResult());
+
+    // 3. 更新数据库
+    testCaseMapper.updateTestCase(originalCase);
+}
 
     /**
      * 删除指定测试用例，若不存在则抛出非法参数异常。
