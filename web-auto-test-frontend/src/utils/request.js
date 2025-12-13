@@ -86,7 +86,7 @@ service.interceptors.response.use(
       }
       return Promise.reject(res);
     }
-    return res.data;
+    return res;
   },
   (error) => {
     // if (error?.config) { removePending(error.config); } // 注释掉这行

@@ -40,6 +40,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/user/login").permitAll()
                 // 放行用例相关接口（开发环境临时用，生产需收窄）
                 .requestMatchers("/api/cases", "/api/addCase", "/api/case/**", "/api/runCase").permitAll()
+                // 新增：放行元素管理所有接口（关键！解决403）
+                .requestMatchers("/api/element/**").permitAll()
                 // 系统用户接口仅admin可访问
                 .requestMatchers("/api/system/user/**").hasAuthority("admin")
                 // 其他所有接口需认证
@@ -53,8 +55,9 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         // 关键：Spring6.x推荐用addAllowedOriginPattern，兼容浏览器CORS限制
-        config.addAllowedOriginPattern("http://localhost:8080");
-        // 允许带凭证（Cookie/Token）
+    // 开发环境：允许所有前端域名（生产环境替换为具体域名）
+        config.addAllowedOriginPattern("*");        
+         // 允许带凭证（Cookie/Token）
         config.setAllowCredentials(true);
         // 允许所有请求方法
         config.addAllowedMethod("*");
