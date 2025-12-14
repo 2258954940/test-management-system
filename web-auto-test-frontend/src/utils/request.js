@@ -15,7 +15,7 @@ import { useUserStore } from "@/store";
 // src/utils/request.js
 const service = axios.create({
   baseURL: process.env.VUE_APP_API_BASE_URL || "/api", // 加回/api前缀，和Postman一致
-  timeout: 5000,
+  timeout: 30000,
   headers: {
     "Content-Type": "application/json;charset=utf-8",
   },

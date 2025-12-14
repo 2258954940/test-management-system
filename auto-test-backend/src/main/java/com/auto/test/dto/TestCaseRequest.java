@@ -32,6 +32,7 @@ public class TestCaseRequest {
     @NotBlank(message = "创建人不能为空")
     private String creator;
 
+    private String elementIds;
     // ========== 补充creator的getter/setter ==========
     public String getCreator() {
         return creator;
@@ -104,5 +105,12 @@ public class TestCaseRequest {
 
     public void setExpectedResult(String expectedResult) {
         this.expectedResult = expectedResult;
+    }
+
+    public String getElementIds() {
+    return elementIds;
+    }
+    public void setElementIds(String elementIds) {
+        this.elementIds = elementIds;
     }
 }

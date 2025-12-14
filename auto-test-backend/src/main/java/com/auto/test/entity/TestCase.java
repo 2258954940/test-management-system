@@ -19,6 +19,7 @@ public class TestCase {
     private LocalDateTime createTime;
     private String creator; // 新增
     private LocalDateTime updateTime;
+    private String elementIds; // 关联的元素ID，逗号分隔
         public LocalDateTime getUpdateTime() {
             return updateTime;
         }
@@ -111,4 +112,12 @@ public class TestCase {
     public void setCreateTime(LocalDateTime createTime) {
         this.createTime = createTime;
     }
+            // 新增getter/setter
+        public String getElementIds() {
+            return elementIds;
+        }
+        public void setElementIds(String elementIds) {
+            this.elementIds = elementIds;
+        }
 }
+

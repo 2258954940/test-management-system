@@ -6,7 +6,6 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeOptions;
 import org.openqa.selenium.io.FileHandler;
-import org.openqa.selenium.PageLoadStrategy;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,24 +43,32 @@ public class SeleniumUtil {
         try {
             switch (type) {
                 case "edge":
-                    // 手动指定 EdgeDriver 路径，放置于 src/main/resources/drivers/msedgedriver.exe
-                    String hardCodedDriverPath = "src/main/resources/drivers/msedgedriver.exe";
-                    Path edgeDriver = Paths.get(hardCodedDriverPath).toAbsolutePath();
-                    if (!Files.exists(edgeDriver)) {
-                        throw new IllegalStateException("未找到 EdgeDriver，可执行文件路径: " + edgeDriver);
-                    }
-                    System.setProperty("webdriver.edge.driver", edgeDriver.toString());
-                    System.out.println("[SeleniumUtil] Edge驱动路径: " + edgeDriver);
-                    EdgeOptions edgeOptions = new EdgeOptions();
-                    edgeOptions.setPageLoadStrategy(PageLoadStrategy.EAGER);
-                    edgeOptions.addArguments("--remote-allow-origins=*");
-                    edgeOptions.addArguments("--start-maximized");
-                    edgeOptions.addArguments("--disable-gpu");
-                    edgeOptions.addArguments("--disable-infobars", "--disable-extensions");
-                    edgeOptions.addArguments("--no-sandbox"); // 关闭沙箱（关键）
-                    edgeOptions.addArguments("--disable-dev-shm-usage"); // 解决资源限制
-                    edgeOptions.addArguments("--remote-debugging-port=9222"); // 强制开启调试模式
-                    return new EdgeDriver(edgeOptions);
+    // 手动指定 EdgeDriver 路径
+    String hardCodedDriverPath = "src/main/resources/drivers/msedgedriver.exe";
+    Path edgeDriver = Paths.get(hardCodedDriverPath).toAbsolutePath();
+    if (!Files.exists(edgeDriver)) {
+        throw new IllegalStateException("未找到 EdgeDriver，可执行文件路径: " + edgeDriver);
+    }
+    System.setProperty("webdriver.edge.driver", edgeDriver.toString());
+    System.out.println("[SeleniumUtil] Edge驱动路径: " + edgeDriver);
+    
+    EdgeOptions edgeOptions = new EdgeOptions();
+    // 关键1：调整页面加载策略为NORMAL（等待页面完全渲染）
+    edgeOptions.setPageLoadStrategy(PageLoadStrategy.NORMAL);
+    edgeOptions.addArguments("--remote-allow-origins=*");
+    edgeOptions.addArguments("--start-maximized");
+    edgeOptions.addArguments("--disable-gpu");
+    edgeOptions.addArguments("--disable-infobars", "--disable-extensions");
+    edgeOptions.addArguments("--no-sandbox");
+    edgeOptions.addArguments("--disable-dev-shm-usage");
+    edgeOptions.addArguments("--remote-debugging-port=9222");
+    // 关键2：禁用百度隐私弹窗/通知弹窗
+    edgeOptions.addArguments("--disable-notifications");
+    edgeOptions.addArguments("--disable-popup-blocking");
+    // 关键3：禁用首次运行弹窗
+    edgeOptions.addArguments("--no-first-run");
+    edgeOptions.addArguments("--no-default-browser-check");
+    return new EdgeDriver(edgeOptions);
 
                 case "chrome":
                 default:
@@ -105,22 +112,35 @@ public class SeleniumUtil {
     /**
      * 执行动作，当前支持 input(输入) 与 click(点击)。
      */
-    public static void performAction(WebElement element, String actionType, String inputData) {
+public static void performAction(WebDriver driver, WebElement element, String actionType, String inputData) {
+    System.out.println("[SeleniumUtil] 准备执行动作：类型=" + actionType + "，输入数据=" + inputData);
+    try {
         switch (actionType.toLowerCase()) {
             case "input":
-                element.clear();
-                if (inputData != null) {
-                    element.sendKeys(inputData);
+                // JS清空+输入，绕过交互检查
+                ((JavascriptExecutor) driver).executeScript("arguments[0].value = '';", element);
+                if (inputData != null && !inputData.isEmpty()) {
+                    ((JavascriptExecutor) driver).executeScript("arguments[0].value = arguments[1];", element, inputData);
+                    System.out.println("[SeleniumUtil] 成功执行JS输入：内容=" + inputData);
+                } else {
+                    System.out.println("[SeleniumUtil] 输入数据为空，跳过输入");
                 }
                 break;
             case "click":
-                element.click();
+                // JS点击，绕过交互检查
+                ((JavascriptExecutor) driver).executeScript("arguments[0].click();", element);
+                System.out.println("[SeleniumUtil] 成功执行JS点击");
                 break;
             default:
                 throw new IllegalArgumentException("不支持的动作类型: " + actionType);
         }
+    } catch (Exception e) {
+        System.err.println("[SeleniumUtil] 动作执行失败：" + e.getMessage());
+        e.printStackTrace();
+        throw e;
     }
-
+    
+}
     /**
      * 截图并返回相对路径，保存在项目根目录下的 screenshots 目录。
      */

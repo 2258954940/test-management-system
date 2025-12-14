@@ -41,9 +41,8 @@
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
 			<artifactId>selenium-java</artifactId>
-			<version>4.21.0</version> <!-- 原4.37.0改成4.21.0 -->
+			<version>4.26.0</version> <!-- 原4.37.0改成4.26.0 -->
 		</dependency>
-		
 		<!-- ========== 保留：适配Spring7.0的MyBatis核心依赖 ========== -->
 		<dependency>
 			<groupId>org.mybatis</groupId>
