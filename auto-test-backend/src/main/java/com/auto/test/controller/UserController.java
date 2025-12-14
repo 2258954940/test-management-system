@@ -30,6 +30,10 @@ public class UserController {
     @PostMapping("/user/login")
     public ApiResponse<Map<String, Object>> login(@RequestBody Map<String, String> payload) {
         try {
+
+         System.out.println("前端传的用户名：" + payload.get("username"));
+         System.out.println("前端传的密码：" + payload.get("password"));
+
             String username = payload.get("username");
             String password = payload.get("password");
             if (!StringUtils.hasText(username) || !StringUtils.hasText(password)) {
@@ -49,6 +53,8 @@ public class UserController {
             data.put("token", token);
             data.put("username", user.getUsername());
             data.put("role", user.getRole());
+            // 新增日志：打印返回的响应
+System.out.println("后端返回的响应：" + ApiResponse.success("登录成功", data));
             return ApiResponse.success("登录成功", data);
         } catch (Exception ex) {
             return ApiResponse.error("服务器错误: " + ex.getMessage(), null);

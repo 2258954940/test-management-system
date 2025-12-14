@@ -8,8 +8,8 @@ module.exports = defineConfig({
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true, // 模拟后端请求的Origin，解决CORS
-        secure: false,
-        pathRewrite: { "^/api": "/api" }, // 完全保留/api前缀，和Postman一致
+        // secure: false,
+        // pathRewrite: { "^/api": "/api" }, // 完全保留/api前缀，和Postman一致
       },
     },
     client: {
