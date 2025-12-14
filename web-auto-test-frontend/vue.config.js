@@ -12,5 +12,8 @@ module.exports = defineConfig({
         pathRewrite: { "^/api": "/api" }, // 完全保留/api前缀，和Postman一致
       },
     },
+    client: {
+      overlay: false, // 关闭webpack开发环境的错误覆盖层
+    },
   },
 });

@@ -11,47 +11,54 @@
       </div>
     </div>
 
-    <el-table
-      :data="displayList"
-      stripe
-      style="width: 100%"
-      class="case-table"
-      row-key="id"
-      :loading="loading"
-    >
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="name" label="用例名称" min-width="160" />
-      <el-table-column
-        prop="url"
-        label="测试URL"
-        min-width="200"
-        show-overflow-tooltip
-      />
+    <!-- 新增：表格包裹容器（用于修复ResizeObserver报错） -->
+    <div ref="tableWrap" class="table-wrap">
+      <el-table
+        :data="displayList"
+        stripe
+        style="width: 100%"
+        class="case-table"
+        row-key="id"
+        :loading="loading"
+      >
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="name" label="用例名称" min-width="160" />
+        <el-table-column
+          prop="url"
+          label="测试URL"
+          min-width="200"
+          show-overflow-tooltip
+        />
 
-      <el-table-column prop="creator" label="创建人" width="120" />
+        <el-table-column prop="creator" label="创建人" width="120" />
 
-      <el-table-column prop="createTime" label="创建时间" width="180">
-        <template #default="{ row }">{{ formatDate(row.createTime) }}</template>
-      </el-table-column>
+        <el-table-column prop="createTime" label="创建时间" width="180">
+          <template #default="{ row }">{{
+            formatDate(row.createTime)
+          }}</template>
+        </el-table-column>
 
-      <el-table-column prop="updateTime" label="更新时间" width="180">
-        <template #default="{ row }">{{ formatDate(row.updateTime) }}</template>
-      </el-table-column>
+        <el-table-column prop="updateTime" label="更新时间" width="180">
+          <template #default="{ row }">{{
+            formatDate(row.updateTime)
+          }}</template>
+        </el-table-column>
 
-      <el-table-column label="操作" width="240" fixed="right">
-        <template #default="{ row }">
-          <el-button type="text" size="small" @click="openEdit(row)"
-            >编辑</el-button
-          >
-          <el-button type="text" size="small" @click="handleDelete(row.id)"
-            >删除</el-button
-          >
-          <el-button type="text" size="small" @click="handleRunCase(row)"
-            >执行</el-button
-          >
-        </template>
-      </el-table-column>
-    </el-table>
+        <el-table-column label="操作" width="240" fixed="right">
+          <template #default="{ row }">
+            <el-button type="text" size="small" @click="openEdit(row)"
+              >编辑</el-button
+            >
+            <el-button type="text" size="small" @click="handleDelete(row.id)"
+              >删除</el-button
+            >
+            <el-button type="text" size="small" @click="handleRunCase(row)"
+              >执行</el-button
+            >
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
     <common-pagination
       :total="pageParams.total"
@@ -141,7 +148,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import CommonQueryForm from "@/components/CommonQueryForm.vue";
 import CommonPagination from "@/components/CommonPagination.vue";
@@ -155,6 +162,10 @@ import {
 import { useUserStore } from "@/store";
 // 新增：导入元素列表接口
 import { getElementList } from "@/api/element";
+
+// 新增：修复ResizeObserver报错相关 - 表格包裹容器ref + 监听实例
+const tableWrap = ref(null);
+let resizeObserver = null;
 
 const queryFields = [
   {
@@ -454,10 +465,35 @@ function formatDate(val) {
   return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
 }
 
+// 新增：初始化表格尺寸监听（根治ResizeObserver报错）
+function initTableResizeObserver() {
+  if (!tableWrap.value) return;
+  resizeObserver = new ResizeObserver((entries) => {
+    setTimeout(() => {
+      const wrap = entries[0].target;
+      wrap.style.height = `${wrap.clientHeight}px`;
+    }, 100);
+  });
+  resizeObserver.observe(tableWrap.value);
+}
+
+// 新增：销毁表格尺寸监听（避免内存泄漏）
+function destroyTableResizeObserver() {
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
+}
+
 onMounted(() => {
   fetchCaseList();
-  // 新增：加载元素列表
   fetchElementList();
+  initTableResizeObserver(); // 初始化监听
+});
+
+// 新增：组件卸载时销毁监听
+onUnmounted(() => {
+  destroyTableResizeObserver();
 });
 </script>
 
@@ -477,6 +513,15 @@ onMounted(() => {
 
 .action-area {
   flex-shrink: 0;
+}
+
+// 新增：表格包裹容器样式（修复报错用）
+.table-wrap {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  box-sizing: border-box;
+  margin-bottom: 16px;
 }
 
 .case-table {
