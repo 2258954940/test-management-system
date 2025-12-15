@@ -160,6 +160,7 @@ import {
   runCase,
 } from "@/api/case";
 import { useUserStore } from "@/store";
+
 // 新增：导入元素列表接口
 import { getElementList } from "@/api/element";
 
@@ -269,15 +270,16 @@ async function fetchCaseList() {
 // 新增：加载元素列表
 async function fetchElementList() {
   try {
-    const res = await getElementList({});
-    if (res.code === 200) {
-      elementList.value = res.data || [];
-    } else {
-      ElMessage.error("加载元素列表失败：" + res.msg);
-    }
+    const res = await getElementList(); // 不传参，正确
+    // 兼容后端返回格式，赋值给ref的value
+    elementList.value = res.data || res || [];
   } catch (err) {
-    elementList.value = [];
-    ElMessage.error("加载元素列表失败：" + err.message);
+    const errMsg =
+      err?.response?.data?.msg ||
+      err?.response?.statusText ||
+      "加载元素列表失败";
+    ElMessage.error(`加载元素列表失败：${errMsg}`);
+    elementList.value = []; // 空列表兜底
   }
 }
 
@@ -380,23 +382,31 @@ function openEdit(row) {
 }
 
 // 新增：执行用例的方法（适配后端参数格式）
+// 替换原有handleRunCase函数
 async function handleRunCase(row) {
+  // 基础校验（毕设必要）
   if (!row.id) {
     ElMessage.error("用例ID为空，无法执行");
     return;
   }
   try {
     ElMessage.info(`正在执行用例：${row.name}`);
-    // 传后端需要的参数格式：{ caseId: 用例ID }（匹配 RunCaseRequest 的 caseId 字段）
     const res = await runCase({ caseId: row.id });
-    // 适配你的 ApiResponse 格式（code/msg/data）
-    if (res.code === 200) {
-      ElMessage.success(`用例执行完成：${res.msg}，状态：${res.data.status}`);
+
+    // 打印验证（毕设调试用，可保留/删除）
+    console.log("后端返回的执行结果：", res);
+
+    // 核心：直接判断后端的status字段（PASS=成功，其他=失败）
+    const execStatus = res.status || "UNKNOWN";
+    if (execStatus === "PASS") {
+      ElMessage.success(`用例执行成功：${row.name}，状态：${execStatus}`);
     } else {
-      ElMessage.error(`用例执行失败：${res.msg}`);
+      ElMessage.error(`用例执行失败：${row.name}，状态：${execStatus}`);
     }
   } catch (err) {
-    ElMessage.error(`执行用例出错：${err.message || "未知错误"}`);
+    // 异常处理（毕设严谨性）
+    const errMsg = err?.message || "执行异常（网络/接口错误）";
+    ElMessage.error(`用例执行出错：${errMsg}`);
   }
 }
 
@@ -518,7 +528,7 @@ onUnmounted(() => {
 // 新增：表格包裹容器样式（修复报错用）
 .table-wrap {
   width: 100%;
-  height: 100%;
+  min-height: 400px;
   overflow: auto;
   box-sizing: border-box;
   margin-bottom: 16px;

@@ -4,12 +4,30 @@ web-auto-test-frontend/dist/
 web-auto-test-frontend/.env
 web-auto-test-frontend/.env.*
 web-auto-test-frontend/.vscode/
+# 补充：前端调试日志/编辑器临时文件
+web-auto-test-frontend/npm-debug.log*
+web-auto-test-frontend/yarn-debug.log*
+web-auto-test-frontend/yarn-error.log*
+web-auto-test-frontend/*.swp
+web-auto-test-frontend/*.swo
 
 # 后端忽略（对应你的auto-test-backend文件夹）
 auto-test-backend/target/
 auto-test-backend/.idea/
 auto-test-backend/.env
+# 补充：后端Maven缓存/构建产物/截图日志
+auto-test-backend/.m2/
+auto-test-backend/*.jar
+auto-test-backend/*.war
+auto-test-backend/screenshots/  # 后端生成的截图，无需提交
+auto-test-backend/logs/         # 后端日志，无需提交
+auto-test-backend/*.iml         # IDEA的模块文件
 
 # 通用忽略文件
 *.log
 .DS_Store
+# 补充：通用编辑器/系统临时文件
+.vscode/
+.idea/
+tmp/
+temp/

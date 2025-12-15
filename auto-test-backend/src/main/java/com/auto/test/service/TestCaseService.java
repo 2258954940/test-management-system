@@ -24,12 +24,16 @@ import java.util.List;
 import com.auto.test.entity.Element;
 import com.auto.test.mapper.ElementMapper;
 import java.util.Arrays;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 /**
  * 用例业务服务：新增、查询、更新、删除、执行。
  */
 @Service
 public class TestCaseService {
-
+// 新增：类级别日志对象
+    private static final Logger log = LoggerFactory.getLogger(TestCaseService.class);
     private final TestCaseMapper testCaseMapper;
     private final TestResultMapper testResultMapper;
     private final ElementMapper elementMapper; // 新增
@@ -69,148 +73,182 @@ public class TestCaseService {
      * 执行指定用例，调用 Selenium，捕获异常并记录结果。
      */
        // 5. 改造runTestCase方法（核心：用元素库替代硬编码，复用SeleniumUtil）
-   @Transactional
-public TestResult runTestCase(Long caseId) {
-    TestCase testCase = testCaseMapper.findById(caseId);
-    if (testCase == null) {
-        throw new IllegalArgumentException("用例不存在，ID=" + caseId);
-    }
+     @Transactional
+    public TestResult runTestCase(Long caseId) {
+        TestCase testCase = testCaseMapper.findById(caseId);
+        if (testCase == null) {
+            throw new IllegalArgumentException("用例不存在，ID=" + caseId);
+        }
 
-    WebDriver driver = null;
-    TestResult result = new TestResult();
-    result.setCaseId(caseId);
-    result.setRunTime(LocalDateTime.now());
-    long start = System.currentTimeMillis();
+        WebDriver driver = null;
+        TestResult result = new TestResult();
+        result.setCaseId(caseId);
+        result.setRunTime(LocalDateTime.now());
+        long start = System.currentTimeMillis();
 
-    try {
-        // 初始化Edge驱动（用你已配置好的SeleniumUtil）
-        driver = SeleniumUtil.createDriver(null, "edge");
-        System.out.println("[TestCaseService] Edge驱动初始化成功，浏览器版本：" + ((HasCapabilities) driver).getCapabilities().getBrowserVersion());
+        try {
+            // ========== 新增：执行开始日志 ==========
+            log.info("【用例执行开始】caseId={}, 用例名称={}, 测试URL={}", 
+                     caseId, testCase.getName(), testCase.getUrl());
+            
+            // 初始化Edge驱动（用你已配置好的SeleniumUtil）
+            driver = SeleniumUtil.createDriver(null, "edge");
+            log.info("[Edge驱动初始化成功] 浏览器版本：{}", 
+                     ((HasCapabilities) driver).getCapabilities().getBrowserVersion());
 
-        // 打开用例页面
-        driver.get(testCase.getUrl());
-        // 延长页面加载等待时间（适配百度加载）
-        new WebDriverWait(driver, Duration.ofSeconds(20)).until(webDriver ->
-            ((JavascriptExecutor) webDriver).executeScript("return document.readyState").equals("complete"));
-        System.out.println("[TestCaseService] 页面加载完成：" + testCase.getUrl());
+            // 打开用例页面
+            driver.get(testCase.getUrl());
+            // 延长页面加载等待时间（适配百度加载）
+            new WebDriverWait(driver, Duration.ofSeconds(20)).until(webDriver ->
+                ((JavascriptExecutor) webDriver).executeScript("return document.readyState").equals("complete"));
+            log.info("[页面加载完成] URL={}, 页面标题={}", testCase.getUrl(), driver.getTitle());
+            
             // 新增：关闭百度隐私政策弹窗（如果存在）
             try {
                 WebElement privacyBtn = driver.findElement(By.xpath("//button[contains(text(),'同意') or contains(text(),'Accept')]"));
                 if (privacyBtn.isDisplayed()) {
                     privacyBtn.click();
-                    System.out.println("[TestCaseService] 关闭百度隐私弹窗成功");
+                    log.info("[百度隐私弹窗] 关闭成功");
                     Thread.sleep(1000); // 弹窗关闭后等待1秒
                 }
             } catch (Exception e) {
-                System.out.println("[TestCaseService] 未检测到百度隐私弹窗，跳过关闭");
-            }
-        // ========== 核心：从元素库取定位器，替代硬编码 ==========
-        String elementIds = testCase.getElementIds();
-        if (elementIds == null || elementIds.trim().isEmpty()) {
-            throw new IllegalArgumentException("用例未关联任何元素，请先在前端绑定元素！");
-        }
-           // -------------------------- 在这里新增打印代码 --------------------------
-        System.out.println("[TestCaseService] 页面标题：" + driver.getTitle());
-        System.out.println("[TestCaseService] 页面源码前500字符：" + driver.getPageSource().substring(0, Math.min(500, driver.getPageSource().length())));
-        // ------------------------------------------------------------------------
-        // 解析元素ID数组
-        String[] elementIdArray = elementIds.split(",");
-        System.out.println("[TestCaseService] 用例关联的元素ID：" + Arrays.toString(elementIdArray));
-
-        // 遍历每个元素，执行自动化操作（复用你的SeleniumUtil工具）
-        for (String elementIdStr : elementIdArray) {
-            Long elementId = Long.parseLong(elementIdStr.trim());
-            Element element = elementMapper.findById(elementId);
-            if (element == null) {
-                throw new IllegalArgumentException("元素不存在，ID=" + elementId);
+                log.warn("[百度隐私弹窗] 未检测到/关闭失败，跳过", e);
             }
 
-            System.out.println("[TestCaseService] 开始处理元素：名称=" + element.getElementName() + "，定位类型=" + element.getLocatorType() + "，定位值=" + element.getLocatorValue());
+            // ========== 核心：从元素库取定位器，替代硬编码 ==========
+            String elementIds = testCase.getElementIds();
+            if (elementIds == null || elementIds.trim().isEmpty()) {
+                throw new IllegalArgumentException("用例未关联任何元素，请先在前端绑定元素！");
+            }
+            log.info("[元素关联] 用例绑定的元素ID列表：{}", elementIds);
 
-            // ========== 关键修改1：显式等待元素可交互（替代原有的findElement） ==========
-            By by = switch (element.getLocatorType().toLowerCase()) {
-                case "id" -> By.id(element.getLocatorValue());
-                case "xpath" -> By.xpath(element.getLocatorValue());
-                case "name" -> By.name(element.getLocatorValue());
-                default -> throw new IllegalArgumentException("不支持的定位方式：" + element.getLocatorType());
-            };
+            // 解析元素ID数组
+            String[] elementIdArray = elementIds.split(",");
+            log.info("[元素解析] 共{}个元素待处理：{}", elementIdArray.length, Arrays.toString(elementIdArray));
+
+            // 遍历每个元素，执行自动化操作（复用你的SeleniumUtil工具）
+            for (String elementIdStr : elementIdArray) {
+                Long elementId = Long.parseLong(elementIdStr.trim());
+                Element element = elementMapper.findById(elementId);
+                if (element == null) {
+                    throw new IllegalArgumentException("元素不存在，ID=" + elementId);
+                }
+
+                log.info("[元素处理开始] ID={}, 名称={}, 定位类型={}, 定位值={}, 控件类型={}",
+                         elementId, element.getElementName(), element.getLocatorType(),
+                         element.getLocatorValue(), element.getWidgetType());
+
+                // ========== 关键修改1：显式等待元素可交互（替代原有的findElement） ==========
+                By by = switch (element.getLocatorType().toLowerCase()) {
+                    case "id" -> By.id(element.getLocatorValue());
+                    case "xpath" -> By.xpath(element.getLocatorValue());
+                    case "name" -> By.name(element.getLocatorValue());
+                    default -> throw new IllegalArgumentException("不支持的定位方式：" + element.getLocatorType());
+                };
 
                 // ========== 关键修改：放宽定位条件，先确保元素存在，再手动聚焦 ==========
                 // 1. 等待元素在DOM中存在（15秒超时，比elementToBeClickable更宽松）
                 WebElement webElement = new WebDriverWait(driver, Duration.ofSeconds(15))
                     .until(ExpectedConditions.presenceOfElementLocated(by));
-                System.out.println("[TestCaseService] 元素已存在（DOM中）：" + element.getElementName());
+                log.info("[元素定位成功] {} - DOM中存在", element.getElementName());
 
-              // 2. 手动等待+滚动到元素可见+JS强制点击（绕过Selenium交互检查）
-        Thread.sleep(1000); 
-        ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", webElement); 
-        // 关键：用JS点击元素，无视Selenium的interactable检查
-        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", webElement); 
-        System.out.println("[TestCaseService] 元素已通过JS聚焦（可操作）：" + element.getElementName());            // ========== 关键修改2：补充动作执行日志 ==========
-                 // 根据元素的widgetType，匹配动作类型（input/click）
-            String actionType = switch (element.getWidgetType().toLowerCase()) {
-                case "input" -> "input"; // 输入框→执行input动作
-                case "button" -> "click"; // 按钮→执行click动作
-                case "select" -> "click"; // 下拉框先点击展开（可扩展）
-                default -> throw new IllegalArgumentException("不支持的控件类型：" + element.getWidgetType());
-            };
-            System.out.println("[TestCaseService] 匹配动作类型：" + actionType + "，输入数据：" + testCase.getInputData());
+                // 2. 手动等待+滚动到元素可见+JS强制点击（绕过Selenium交互检查）
+                Thread.sleep(1000); 
+                ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", webElement); 
+                // 关键：用JS点击元素，无视Selenium的interactable检查
+                ((JavascriptExecutor) driver).executeScript("arguments[0].click();", webElement); 
+                log.info("[元素操作成功] {} - JS聚焦/点击完成", element.getElementName());
 
-            // 执行动作（输入框填用例的inputData，按钮直接点击）
-           SeleniumUtil.performAction(driver, webElement, actionType, testCase.getInputData());
+                // ========== 关键修改2：补充动作执行日志 ==========
+                // 根据元素的widgetType，匹配动作类型（input/click）
+                String actionType = switch (element.getWidgetType().toLowerCase()) {
+                    case "input" -> "input"; // 输入框→执行input动作
+                    case "button" -> "click"; // 按钮→执行click动作
+                    case "select" -> "click"; // 下拉框先点击展开（可扩展）
+                    default -> throw new IllegalArgumentException("不支持的控件类型：" + element.getWidgetType());
+                };
+                log.info("[动作匹配] {} - 动作类型={}, 输入数据={}",
+                         element.getElementName(), actionType, testCase.getInputData());
 
-            System.out.println("[TestCaseService] 成功执行动作：" + actionType + "，元素：" + element.getElementName());
+                // 执行动作（输入框填用例的inputData，按钮直接点击）
+                SeleniumUtil.performAction(driver, webElement, actionType, testCase.getInputData());
+                log.info("[动作执行完成] {} - 输入内容：{}", element.getElementName(), testCase.getInputData());
 
-            // 动作后等待（避免页面未响应，延长到1秒）
-            Thread.sleep(1000);
+                // 动作后等待（避免页面未响应，延长到1秒）
+                Thread.sleep(1000);
+            }
+
+            // // ========== 验证预期结果（保留原有逻辑，加日志） ==========
+            // String expectedResult = testCase.getExpectedResult();
+            // if (expectedResult != null && !expectedResult.isEmpty()) {
+            //     log.info("[预期结果验证] 开始验证：{}", expectedResult);
+            //     boolean isExpected = new WebDriverWait(driver, Duration.ofSeconds(10))
+            //         .until(ExpectedConditions.textToBePresentInElementLocated(
+            //             By.tagName("body"), expectedResult));
+            //     if (!isExpected) {
+            //         throw new Exception("预期结果未匹配：页面未包含文本「" + expectedResult + "」");
+            //     }
+            //     log.info("[预期结果验证] 通过");
+            // }
+
+            // 截图（复用你的SeleniumUtil）
+            String screenshotPath = SeleniumUtil.takeScreenshot(driver, testCase.getName());
+            result.setScreenshotPath(screenshotPath);
+            result.setStatus("PASS");
+            result.setMessage("执行成功，截图路径：" + screenshotPath);
+            log.info("【用例执行成功】caseId={}, 耗时={}ms, 截图路径={}",
+                     caseId, System.currentTimeMillis() - start, screenshotPath);
+
+        } catch (IllegalArgumentException ex) {
+            result.setStatus("FAILED");
+            // 兜底：确保message不为空
+            String errMsg = "参数错误: " + (ex.getMessage() == null ? "无参数信息" : ex.getMessage());
+            result.setMessage(errMsg);
+            result.setScreenshotPath(takeFailScreenshot(driver, testCase));
+            log.error("【用例执行失败-参数错误】caseId={}, 原因={}", caseId, errMsg, ex); // 打印堆栈
+        } catch (IOException ioEx) {
+            result.setStatus("FAILED");
+            String errMsg = "截图失败: " + (ioEx.getMessage() == null ? "IO异常无信息" : ioEx.getMessage());
+            result.setMessage(errMsg);
+            result.setScreenshotPath(null);
+            log.error("【用例执行失败-截图错误】caseId={}, 原因={}", caseId, errMsg, ioEx); // 打印堆栈
+        } catch (Exception ex) {
+            result.setStatus("FAILED");
+            // 核心兜底：异常信息为空时，用异常类型兜底
+            String errMsg = "执行异常: " + (ex.getMessage() == null ? ex.getClass().getName() : ex.getMessage());
+            result.setMessage(errMsg);
+            result.setScreenshotPath(takeFailScreenshot(driver, testCase));
+            log.error("【用例执行失败-运行异常】caseId={}, 原因={}", caseId, errMsg, ex); // 打印完整堆栈
+        } finally {
+            // ========== 新增：finally块加try-catch，避免吞异常 ==========
+            try {
+                result.setDurationMs(System.currentTimeMillis() - start);
+                log.info("[执行收尾] caseId={}, 总耗时={}ms, 执行状态={}",
+                         caseId, result.getDurationMs(), result.getStatus());
+
+                // 关闭驱动
+                if (driver != null) {
+                    try { 
+                        Thread.sleep(3000); 
+                        driver.quit();
+                        log.info("[驱动关闭] caseId={} 成功", caseId);
+                    } catch (Exception ignored) {
+                        log.warn("[驱动关闭] caseId={} 失败", caseId, ignored);
+                    }
+                }
+
+                // 保存执行结果到数据库（核心：加日志+异常捕获）
+                testResultMapper.insertTestResult(result);
+                log.info("[结果保存] caseId={} 执行结果已存入数据库，状态={}", caseId, result.getStatus());
+            } catch (Exception e) {
+                // 捕获finally块的异常，避免吞掉核心执行异常
+                log.error("【finally块异常】caseId={} 收尾操作失败（保存结果/关闭驱动）", caseId, e);
+                // 兜底：更新result的message，把finally异常也带上
+                result.setMessage(result.getMessage() + " | 收尾异常：" + e.getMessage());
+            }
         }
-
-        // ========== 验证预期结果（保留原有逻辑，加日志） ==========
-        // String expectedResult = testCase.getExpectedResult();
-        // if (expectedResult != null && !expectedResult.isEmpty()) {
-        //     System.out.println("[TestCaseService] 开始验证预期结果：" + expectedResult);
-        //     boolean isExpected = new WebDriverWait(driver, Duration.ofSeconds(10))
-        //         .until(ExpectedConditions.textToBePresentInElementLocated(
-        //             By.tagName("body"), expectedResult));
-        //     if (!isExpected) {
-        //         throw new Exception("预期结果未匹配：页面未包含文本「" + expectedResult + "」");
-        //     }
-        //     System.out.println("[TestCaseService] 预期结果验证通过");
-        // }
-
-        // 截图（复用你的SeleniumUtil）
-        String screenshotPath = SeleniumUtil.takeScreenshot(driver, testCase.getName());
-        result.setScreenshotPath(screenshotPath);
-        result.setStatus("PASS");
-        result.setMessage("执行成功，截图路径：" + screenshotPath);
-
-    } catch (IllegalArgumentException ex) {
-        result.setStatus("FAILED");
-        result.setMessage("参数错误: " + ex.getMessage());
-        result.setScreenshotPath(takeFailScreenshot(driver, testCase));
-        System.err.println("[TestCaseService] 执行失败（参数错误）：" + ex.getMessage());
-    } catch (IOException ioEx) {
-        result.setStatus("FAILED");
-        result.setMessage("截图失败: " + ioEx.getMessage());
-        result.setScreenshotPath(null);
-        System.err.println("[TestCaseService] 执行失败（截图错误）：" + ioEx.getMessage());
-    } catch (Exception ex) {
-        result.setStatus("FAILED");
-        result.setMessage("执行异常: " + ex.getMessage());
-        result.setScreenshotPath(takeFailScreenshot(driver, testCase));
-        System.err.println("[TestCaseService] 执行失败（运行异常）：" + ex.getMessage());
-        // 打印完整异常堆栈（关键！定位根因）
-        ex.printStackTrace();
-    } finally {
-        result.setDurationMs(System.currentTimeMillis() - start);
-        if (driver != null) {
-            try { Thread.sleep(3000); } catch (InterruptedException ignored) {}
-            driver.quit();
-        }
-        testResultMapper.insertTestResult(result);
+        return result;
     }
-    return result;
-}
 
     /**
      * 查询所有测试用例，按创建时间倒序。

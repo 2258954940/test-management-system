@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 用例接口层，对接前端 Vue，请求体为 JSON。
  */
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/cases")
 @CrossOrigin(origins = "http://localhost:8080")
 public class TestCaseController {
 
@@ -41,19 +41,20 @@ public class TestCaseController {
         }
     }
 
-    @PostMapping("/runCase")
-    public ApiResponse<TestResult> runCase(@Valid @RequestBody RunCaseRequest request) {
-        try {
-            TestResult result = testCaseService.runTestCase(request.getCaseId());
-            String msg = "执行完毕，状态: " + result.getStatus();
-            return ApiResponse.success(msg, result);
-        } catch (Exception ex) {
-            // 捕获用例不存在、驱动错误等异常，返回友好提示。
-            return ApiResponse.error("执行失败: " + ex.getMessage(), null);
-        }
+@PostMapping("/runCase")
+public ApiResponse<TestResult> runCase(@Valid @RequestBody RunCaseRequest request) {
+    try {
+        TestResult result = testCaseService.runTestCase(request.getCaseId());
+        String msg = "执行完毕，状态: " + result.getStatus();
+        return ApiResponse.success(msg, result);
+    } catch (Exception ex) {
+        // 核心修复：给异常信息兜底，避免msg为undefined
+        String errMsg = ex.getMessage() == null ? "用例执行异常（无具体信息）" : ex.getMessage();
+        return ApiResponse.error("执行失败: " + errMsg, null);
     }
+}
 
-    @GetMapping("/cases")
+    @GetMapping("")
     public ApiResponse<java.util.List<TestCase>> listCases() {
         try {
             return ApiResponse.success("查询成功", testCaseService.listAll());

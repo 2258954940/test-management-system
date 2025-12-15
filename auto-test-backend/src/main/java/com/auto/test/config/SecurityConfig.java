@@ -39,17 +39,19 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             // 5. 权限规则（核心：用HttpMethod指定方法，路径以/开头）
             .authorizeHttpRequests(auth -> auth
-                // ✅ 正确写法：HttpMethod.POST + 完整路径（以/开头）
+                // HttpMethod.POST + 完整路径（以/开头）
                 .requestMatchers(HttpMethod.POST, "/api/user/login").permitAll()
-                // ✅ 正确写法：HttpMethod.OPTIONS + 通配路径（以/开头）
+                // HttpMethod.OPTIONS + 通配路径（以/开头）
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // 开发环境临时放行用例/元素接口
-                .requestMatchers("/api/case/**").permitAll()
+                .requestMatchers("/api/cases/**").permitAll()
                 .requestMatchers("/api/element/**").permitAll()
                 // 系统用户接口仅admin可访问
                 .requestMatchers("/api/system/user/**").hasAuthority("admin")
-                // 其他接口需认证
-                .anyRequest().authenticated()
+                // // 其他接口需认证
+                // .anyRequest().authenticated()
+                 // 🔥 临时修改：放行所有请求（开发环境）
+            .anyRequest().permitAll() 
             );
 
         return http.build();

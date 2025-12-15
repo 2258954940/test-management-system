@@ -217,22 +217,30 @@ const pageParams = reactive({
 const filter = reactive({ elementName: "", pageUrl: "", widgetType: "" }); // 改：filter字段对齐后端
 
 // 新增：加载元素列表的方法
+// ElementManage/index.vue 中的 fetchElementList 方法
 async function fetchElementList() {
   loading.value = true;
   try {
-    const res = await getElementList({
-      pageNum: pageParams.pageNum,
-      pageSize: pageParams.pageSize,
-      ...filter,
-    });
-    if (res.code === 200) {
-      fullList.value = res.data || [];
-      pageParams.total = fullList.value.length; // 后端暂时没分页，用总条数
+    const res = await getElementList();
+    // 核心：兼容后端两种返回格式（Map/ApiResponse）
+    if (res.code === 200 || res.code === undefined) {
+      // 后端返回Map时，res.data 或 res本身是列表
+      fullList.value = res.data || res || [];
+      pageParams.total = fullList.value.length;
     } else {
       ElMessage.error(res.msg || "查询元素列表失败");
+      fullList.value = [];
+      pageParams.total = 0;
     }
   } catch (err) {
-    ElMessage.error("查询元素列表失败：" + err.message);
+    // 核心修复：彻底避免undefined，分层取错误信息
+    const errMsg =
+      err?.response?.data?.msg || // 优先取后端返回的msg
+      err?.response?.statusText || // 再取HTTP状态描述
+      "查询元素列表失败"; // 最后用默认值
+    ElMessage.error(`查询元素列表失败：${errMsg}`);
+    fullList.value = [];
+    pageParams.total = 0;
   } finally {
     loading.value = false;
   }

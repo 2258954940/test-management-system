@@ -5,9 +5,10 @@ import service from "@/utils/request";
  * GET /api/element
  * @param {Object} params { pageNum, pageSize, elementName, page, controlType }
  */
-export function getElementList(params) {
-  // 后端暂时没做分页，先传空params，后续再扩展
-  return service.get("/element", { params });
+// src/api/element.js 中的 getElementList 方法
+export function getElementList() {
+  // 核心修改：后端暂时无参数，直接请求，不传params
+  return service.get("/element"); // 删掉 { params }
 }
 
 /**

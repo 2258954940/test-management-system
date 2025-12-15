@@ -26,34 +26,25 @@ const service = axios.create({
 // src/utils/request.js —— 请求拦截器中添加日志
 service.interceptors.request.use(
   (config) => {
-    // 打印请求信息，排查是否带了多余头
     console.log("请求URL:", config.url);
-    console.log("是否登录请求:", config.url.includes("/user/login"));
-    console.log("请求头:", config.headers);
-
     const isLoginRequest = config.url.includes("/user/login");
-    if (!isLoginRequest) {
-      // 非登录请求才加Token/Role
-      let token = "";
-      let role = "";
-      try {
-        const userStore = useUserStore();
-        if (userStore) {
-          token = userStore.token || "";
-          role = userStore.role || "";
-        }
-      } catch (err) {
-        token = localStorage.getItem("token") || "";
-        role = localStorage.getItem("role") || "";
-      }
+    console.log("是否登录请求:", isLoginRequest);
 
+    if (!isLoginRequest) {
+      // 从localStorage取Token（确认有值）
+      const token = localStorage.getItem("token") || "";
+      const role = localStorage.getItem("role") || "";
+
+      // 🔥 核心修复：用普通对象覆盖headers，彻底绕过AxiosHeaders不可变限制
       config.headers = {
-        ...config.headers,
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(role ? { "X-Role": role } : {}),
+        "Content-Type": "application/json;charset=utf-8", // 保留默认Content-Type
+        ...(token ? { Authorization: `Bearer ${token}` } : {}), // 加Token
+        ...(role ? { "X-Role": role } : {}), // 加角色
       };
     }
 
+    // 打印最终请求头（此时应该能看到Token）
+    console.log("最终请求头:", config.headers);
     return config;
   },
   (error) => {
