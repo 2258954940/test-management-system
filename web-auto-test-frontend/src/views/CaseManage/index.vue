@@ -384,7 +384,6 @@ function openEdit(row) {
 // 新增：执行用例的方法（适配后端参数格式）
 // 替换原有handleRunCase函数
 async function handleRunCase(row) {
-  // 基础校验（毕设必要）
   if (!row.id) {
     ElMessage.error("用例ID为空，无法执行");
     return;
@@ -392,19 +391,22 @@ async function handleRunCase(row) {
   try {
     ElMessage.info(`正在执行用例：${row.name}`);
     const res = await runCase({ caseId: row.id });
-
-    // 打印验证（毕设调试用，可保留/删除）
     console.log("后端返回的执行结果：", res);
 
-    // 核心：直接判断后端的status字段（PASS=成功，其他=失败）
+    // 优化：区分UNKNOWN（操作执行但未验证）和FAIL（真失败）
     const execStatus = res.status || "UNKNOWN";
     if (execStatus === "PASS") {
       ElMessage.success(`用例执行成功：${row.name}，状态：${execStatus}`);
+    } else if (execStatus === "UNKNOWN") {
+      // UNKNOWN只是没验证结果，不是执行失败
+      ElMessage.warning(
+        `用例执行完成（未验证结果）：${row.name}，状态：${execStatus}`
+      );
     } else {
+      // 只有status=FAIL才是真失败
       ElMessage.error(`用例执行失败：${row.name}，状态：${execStatus}`);
     }
   } catch (err) {
-    // 异常处理（毕设严谨性）
     const errMsg = err?.message || "执行异常（网络/接口错误）";
     ElMessage.error(`用例执行出错：${errMsg}`);
   }

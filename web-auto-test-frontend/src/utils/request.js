@@ -55,8 +55,6 @@ service.interceptors.request.use(
 // 响应拦截器：注释重复请求移除逻辑
 service.interceptors.response.use(
   (response) => {
-    // removePending(response.config); // 注释掉这行
-
     const res = response.data;
     if (res.code !== 200) {
       if (res.code === 401) {
@@ -77,7 +75,7 @@ service.interceptors.response.use(
       }
       return Promise.reject(res);
     }
-    return res.data;
+    return res;
   },
   (error) => {
     // if (error?.config) { removePending(error.config); } // 注释掉这行

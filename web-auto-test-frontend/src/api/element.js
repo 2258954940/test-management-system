@@ -5,10 +5,8 @@ import service from "@/utils/request";
  * GET /api/element
  * @param {Object} params { pageNum, pageSize, elementName, page, controlType }
  */
-// src/api/element.js 中的 getElementList 方法
 export function getElementList() {
-  // 核心修改：后端暂时无参数，直接请求，不传params
-  return service.get("/element"); // 删掉 { params }
+  return service.get("/element");
 }
 
 /**
@@ -17,14 +15,13 @@ export function getElementList() {
  * @param {Object} data { elementName, locatorType, locatorValue, pageUrl, widgetType }
  */
 export function addElement(data) {
-  // 字段映射：前端name→后端elementName，page→pageUrl，controlType→widgetType
   const reqData = {
     elementName: data.name,
     locatorType: data.locatorType,
     locatorValue: data.locatorValue,
     pageUrl: data.page,
     widgetType: data.controlType,
-    createBy: "admin", // 固定创建人
+    createBy: "admin",
   };
   return service.post("/element", reqData);
 }
@@ -36,7 +33,6 @@ export function addElement(data) {
  * @param {Object} data 同 addElement
  */
 export function updateElement(id, data) {
-  // 字段映射和新增一致
   const reqData = {
     elementName: data.name,
     locatorType: data.locatorType,
@@ -57,33 +53,33 @@ export function deleteElement(id) {
   return service.delete(`/element/${id}`);
 }
 
+// ========== 1. 改：解析接口命名+字段适配（和前端调用对齐） ==========
 /**
- * DOM 解析元素（保留，后续对接后端）
+ * DOM 解析元素（对接后端真实接口）
  * POST /api/element/parse
  * @param {Object} data { url }
- * @returns Promise<{ list: [{ name, locatorType, locatorValue, controlType }] }>
  */
-export function parseElement(data) {
+export function parseUrlElements(data) {
+  // 改名：parseElement → parseUrlElements（和前端调用一致）
   return service.post("/element/parse", data);
 }
 
 /**
- * 批量导入元素（保留，后续对接后端）
+ * 批量导入元素（保留，调整字段映射）
  * POST /api/element/batchImport
  * @param {Object} data { list: [] } 解析后的元素数组
  */
 export function batchImportElement(data) {
-  // 字段映射后传给后端
+  // 改：pageUrl赋值为解析的URL（而非空），适配后端
   const reqList = data.list.map((item) => ({
-    elementName: item.name,
+    elementName: item.name, // 前端parseResult的name → 后端elementName
     locatorType: item.locatorType,
     locatorValue: item.locatorValue,
-    pageUrl: "", // 批量导入暂时默认空页面
-    widgetType: item.controlType,
+    pageUrl: data.url || "", // 补充：把解析的URL传给pageUrl
+    widgetType: item.controlType, // 前端controlType → 后端widgetType
     createBy: "admin",
   }));
   return service.post("/element/batchImport", { list: reqList });
 }
 
-// 保留默认导出
 export { getElementList as default };
