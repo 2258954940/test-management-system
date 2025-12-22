@@ -1,116 +1,38 @@
 package com.auto.test.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import lombok.Data;
 
 /**
- * 新增测试用例请求体，兼容前端 JSON 传参。
+ * 新增/编辑用例的请求DTO（必须包含断言字段）
  */
+@Data
 public class TestCaseRequest {
-
+    // 原有字段（保持不变）
     @NotBlank(message = "用例名称不能为空")
     private String name;
-
-    private String description; // 前端传了，非必填
-
-    @NotBlank(message = "访问地址不能为空")
+    @NotBlank(message = "测试URL不能为空")
     private String url;
-
-    // 暂时去掉必填校验（前端还没做这些字段的输入框）
-    private String locatorType;
-
-    private String locatorValue;
-
-    private String actionType;
-
+    @NotBlank(message = "步骤不能为空")
+    private String description;
+    @NotBlank(message = "输入数据不能为空")
     private String inputData;
-
-    // 暂时去掉必填校验（前端还没做）
+    @NotBlank(message = "预期结果不能为空")
     private String expectedResult;
-
-    // 新增：接收前端传的creator字段
-    @NotBlank(message = "创建人不能为空")
     private String creator;
-
     private String elementIds;
-    // ========== 补充creator的getter/setter ==========
-    public String getCreator() {
-        return creator;
-    }
-
-    public void setCreator(String creator) {
-        this.creator = creator;
-    }
-
-    // ========== 原有字段的getter/setter保留 ==========
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
-    }
-
-    public String getLocatorType() {
-        return locatorType;
-    }
-
-    public void setLocatorType(String locatorType) {
-        this.locatorType = locatorType;
-    }
-
-    public String getLocatorValue() {
-        return locatorValue;
-    }
-
-    public void setLocatorValue(String locatorValue) {
-        this.locatorValue = locatorValue;
-    }
-
-    public String getActionType() {
-        return actionType;
-    }
-
-    public void setActionType(String actionType) {
-        this.actionType = actionType;
-    }
-
-    public String getInputData() {
-        return inputData;
-    }
-
-    public void setInputData(String inputData) {
-        this.inputData = inputData;
-    }
-
-    public String getExpectedResult() {
-        return expectedResult;
-    }
-
-    public void setExpectedResult(String expectedResult) {
-        this.expectedResult = expectedResult;
-    }
-
-    public String getElementIds() {
-    return elementIds;
-    }
-    public void setElementIds(String elementIds) {
-        this.elementIds = elementIds;
-    }
+    private String locatorType;
+    private String locatorValue;
+    private String actionType;
+    private Boolean needLogin; // 是否需要登录
+    private String siteCode;   // 关联的网站编码
+    // ========== 新增：断言字段（和前端提交的key完全对应） ==========
+    @NotBlank(message = "断言类型不能为空")
+    private String assertType;
+    @NotBlank(message = "断言定位类型不能为空")
+    private String assertLocatorType;
+    @NotBlank(message = "断言定位值不能为空")
+    private String assertLocatorValue;
+    @NotBlank(message = "断言预期值不能为空（文本断言）")
+    private String assertExpectedValue;
 }

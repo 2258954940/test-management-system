@@ -14,25 +14,50 @@ import java.util.List;
  */
 public interface TestCaseMapper {
 
-    // 改动1：INSERT 加 element_ids 字段（核心！存入关联元素ID）
-    @Insert("INSERT INTO test_case(name, description, url, locator_type, locator_value, action_type, input_data, expected_result, creator, element_ids, create_time) " +
-            "VALUES(#{name}, #{description}, #{url}, #{locatorType}, #{locatorValue}, #{actionType}, #{inputData}, #{expectedResult}, #{creator}, #{elementIds}, NOW())")
+    // 核心修改：INSERT 语句补充断言+登录相关字段
+    @Insert("INSERT INTO test_case(" +
+            "name, description, url, locator_type, locator_value, action_type, " +
+            "input_data, expected_result, creator, element_ids, " +
+            "assert_type, assert_locator_type, assert_locator_value, assert_expected_value, " +
+            "need_login, site_code, create_time, update_time" +
+            ") VALUES(" +
+            "#{name}, #{description}, #{url}, #{locatorType}, #{locatorValue}, #{actionType}, " +
+            "#{inputData}, #{expectedResult}, #{creator}, #{elementIds}, " +
+            "#{assertType}, #{assertLocatorType}, #{assertLocatorValue}, #{assertExpectedValue}, " +
+            "#{needLogin}, #{siteCode}, NOW(), NOW()" +
+            ")")
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     int insertTestCase(TestCase testCase);
 
-    // 改动2：SELECT 加 element_ids 字段（查询时能读到关联元素ID）
-    @Select("SELECT id, name, description, url, locator_type, locator_value, action_type, input_data, expected_result, creator, element_ids, create_time, update_time " +
+    // 核心修改：SELECT 语句补充断言+登录相关字段
+    @Select("SELECT " +
+            "id, name, description, url, locator_type, locator_value, action_type, " +
+            "input_data, expected_result, creator, element_ids, " +
+            "assert_type, assert_locator_type, assert_locator_value, assert_expected_value, " +
+            "need_login, site_code, create_time, update_time " +
             "FROM test_case WHERE id = #{id}")
     TestCase findById(Long id);
 
-    // 改动3：SELECT ALL 加 element_ids 字段（列表查询也能读到）
-    @Select("SELECT id, name, description, url, locator_type, locator_value, action_type, input_data, expected_result, creator, element_ids, create_time, update_time " +
+    // 核心修改：SELECT ALL 补充断言+登录相关字段
+    @Select("SELECT " +
+            "id, name, description, url, locator_type, locator_value, action_type, " +
+            "input_data, expected_result, creator, element_ids, " +
+            "assert_type, assert_locator_type, assert_locator_value, assert_expected_value, " +
+            "need_login, site_code, create_time, update_time " +
             "FROM test_case ORDER BY create_time DESC")
     List<TestCase> findAll();
 
-    // 改动4：UPDATE 加 element_ids 字段（编辑时更新关联元素ID）
-    @Update("UPDATE test_case SET name=#{name}, description=#{description}, url=#{url}, locator_type=#{locatorType}, locator_value=#{locatorValue}, " +
-            "action_type=#{actionType}, input_data=#{inputData}, expected_result=#{expectedResult}, creator=#{creator}, element_ids=#{elementIds} WHERE id=#{id}")
+    // 核心修改：UPDATE 语句补充断言+登录相关字段
+    @Update("UPDATE test_case SET " +
+            "name=#{name}, description=#{description}, url=#{url}, " +
+            "locator_type=#{locatorType}, locator_value=#{locatorValue}, action_type=#{actionType}, " +
+            "input_data=#{inputData}, expected_result=#{expectedResult}, creator=#{creator}, " +
+            "element_ids=#{elementIds}, " +
+            "assert_type=#{assertType}, assert_locator_type=#{assertLocatorType}, " +
+            "assert_locator_value=#{assertLocatorValue}, assert_expected_value=#{assertExpectedValue}, " +
+            "need_login=#{needLogin}, site_code=#{siteCode}, " +
+            "update_time=NOW() " +
+            "WHERE id=#{id}")
     int updateTestCase(TestCase testCase);
 
     @Delete("DELETE FROM test_case WHERE id = #{id}")

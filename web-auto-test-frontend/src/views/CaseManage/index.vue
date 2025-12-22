@@ -11,7 +11,6 @@
       </div>
     </div>
 
-    <!-- 新增：表格包裹容器（用于修复ResizeObserver报错） -->
     <div ref="tableWrap" class="table-wrap">
       <el-table
         :data="displayList"
@@ -29,21 +28,34 @@
           min-width="200"
           show-overflow-tooltip
         />
-
+        <el-table-column prop="needLogin" label="是否需要登录" width="100">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.needLogin ? 'success' : 'info'">
+              {{ row.needLogin ? "是" : "否" }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column
+          prop="siteCode"
+          label="关联网站"
+          width="120"
+          show-overflow-tooltip
+        >
+          <template #default="{ row }">
+            {{ getSiteNameByCode(row.siteCode) || "-" }}
+          </template>
+        </el-table-column>
         <el-table-column prop="creator" label="创建人" width="120" />
-
         <el-table-column prop="createTime" label="创建时间" width="180">
           <template #default="{ row }">{{
             formatDate(row.createTime)
           }}</template>
         </el-table-column>
-
         <el-table-column prop="updateTime" label="更新时间" width="180">
           <template #default="{ row }">{{
             formatDate(row.updateTime)
           }}</template>
         </el-table-column>
-
         <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
             <el-button type="text" size="small" @click="openEdit(row)"
@@ -52,7 +64,7 @@
             <el-button type="text" size="small" @click="handleDelete(row.id)"
               >删除</el-button
             >
-            <el-button type="text" size="small" @click="handleRunCase(row)"
+            <el-button type="text" size="small" @click="openRunCaseDialog(row)"
               >执行</el-button
             >
           </template>
@@ -68,6 +80,7 @@
       @onPageChange="handlePageChange"
     />
 
+    <!-- 新增/编辑用例弹窗 -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
@@ -95,14 +108,12 @@
             placeholder="请输入执行步骤（支持多行）"
           />
         </el-form-item>
-        <!-- 新增：输入数据输入框 -->
         <el-form-item label="输入数据" prop="inputData">
           <el-input
             v-model="formModel.inputData"
             placeholder="请输入要在输入框中填写的内容（如：自动化测试）"
           />
         </el-form-item>
-        <!-- 新增：预期结果输入框 -->
         <el-form-item label="预期结果" prop="expectedResult">
           <el-input
             v-model="formModel.expectedResult"
@@ -116,7 +127,61 @@
             :disabled="isEdit"
           />
         </el-form-item>
-        <!-- 新增：关联元素选择框 -->
+        <!-- 新增：登录相关配置 -->
+        <el-form-item label="是否需要登录" prop="needLogin">
+          <el-switch
+            v-model="formModel.needLogin"
+            active-text="是"
+            inactive-text="否"
+          />
+        </el-form-item>
+        <el-form-item
+          label="关联测试网站"
+          prop="siteCode"
+          v-if="formModel.needLogin"
+        >
+          <el-select v-model="formModel.siteCode" placeholder="请选择测试网站">
+            <el-option
+              v-for="config in siteConfigs"
+              :key="config.siteCode"
+              :label="config.siteName"
+              :value="config.siteCode"
+            ></el-option>
+            <!-- 自闭合或闭合标签都可以，这里写完整闭合更规范 -->
+          </el-select>
+        </el-form-item>
+        <!-- 断言配置字段 -->
+        <el-form-item label="断言类型" prop="assertType">
+          <el-select
+            v-model="formModel.assertType"
+            placeholder="请选择断言类型"
+          >
+            <el-option label="文本断言" value="TEXT" />
+            <el-option label="元素存在断言" value="EXISTS" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="断言定位类型" prop="assertLocatorType">
+          <el-select
+            v-model="formModel.assertLocatorType"
+            placeholder="请选择定位类型"
+          >
+            <el-option label="ID" value="id" />
+            <el-option label="XPath" value="xpath" />
+            <el-option label="Name" value="name" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="断言定位值" prop="assertLocatorValue">
+          <el-input
+            v-model="formModel.assertLocatorValue"
+            placeholder="请输入断言元素的定位值（如//a[contains(text(),'罗技G502')]）"
+          />
+        </el-form-item>
+        <el-form-item label="断言预期值" prop="assertExpectedValue">
+          <el-input
+            v-model="formModel.assertExpectedValue"
+            placeholder="请输入断言预期结果（文本断言必填）"
+          />
+        </el-form-item>
         <el-form-item label="关联元素">
           <el-select
             v-model="formModel.elementIds"
@@ -144,6 +209,73 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 执行用例弹窗（仅显示账号密码，从用例读取登录配置） -->
+    <el-dialog
+      v-model="runCaseDialogVisible"
+      title="执行用例"
+      width="500px"
+      style="z-index: 9999"
+    >
+      <el-form
+        ref="runCaseFormRef"
+        :model="runCaseForm"
+        :rules="runCaseRules"
+        label-width="100px"
+      >
+        <el-form-item label="用例ID" prop="caseId">
+          <el-input v-model="runCaseForm.caseId" disabled />
+        </el-form-item>
+        <!-- 仅当用例需要登录时显示账号密码 -->
+        <el-form-item
+          label="测试账号"
+          prop="username"
+          v-if="currentCase.needLogin"
+        >
+          <el-input
+            v-model="runCaseForm.username"
+            placeholder="请输入登录账号"
+          />
+        </el-form-item>
+        <el-form-item
+          label="测试密码"
+          prop="password"
+          v-if="currentCase.needLogin"
+        >
+          <el-input
+            v-model="runCaseForm.password"
+            type="password"
+            placeholder="请输入登录密码"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="runCaseDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="runCaseLoading"
+          @click="handleRunCaseSubmit"
+          :disabled="
+            currentCase.needLogin &&
+            (!runCaseForm.username || !runCaseForm.password)
+          "
+        >
+          执行用例
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 验证详情弹窗 -->
+    <el-dialog
+      v-model="verifyDetailDialogVisible"
+      title="验证详情"
+      width="600px"
+    >
+      <el-table :data="verifyDetailList" border style="width: 100%">
+        <el-table-column prop="type" label="验证类型" width="120" />
+        <el-table-column prop="result" label="验证结果" />
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
@@ -160,11 +292,9 @@ import {
   runCase,
 } from "@/api/case";
 import { useUserStore } from "@/store";
-
-// 新增：导入元素列表接口
 import { getElementList } from "@/api/element";
+import { getSiteConfigs } from "@/api/siteConfig";
 
-// 新增：修复ResizeObserver报错相关 - 表格包裹容器ref + 监听实例
 const tableWrap = ref(null);
 let resizeObserver = null;
 
@@ -186,8 +316,62 @@ const queryFields = [
 const caseList = ref([]);
 const loading = ref(false);
 const submitLoading = ref(false);
-// 新增：元素列表
 const elementList = ref([]);
+const siteConfigs = ref([]);
+
+// 当前选中的用例（用于执行弹窗）
+const currentCase = reactive({
+  id: "",
+  needLogin: false,
+  siteCode: "",
+  assertExpectedValue: "",
+});
+
+// 执行用例相关
+const runCaseDialogVisible = ref(false);
+const runCaseLoading = ref(false);
+const runCaseFormRef = ref(null);
+const runCaseForm = reactive({
+  caseId: "",
+  username: "",
+  password: "",
+});
+
+// 执行用例表单规则
+const runCaseRules = reactive({
+  username: [
+    {
+      required: true,
+      message: "请输入测试账号",
+      trigger: "blur",
+      validator: (rule, value, callback) => {
+        if (currentCase.needLogin && !value) {
+          callback(new Error(rule.message));
+        } else {
+          callback();
+        }
+      },
+    },
+  ],
+  password: [
+    {
+      required: true,
+      message: "请输入测试密码",
+      trigger: "blur",
+      validator: (rule, value, callback) => {
+        if (currentCase.needLogin && !value) {
+          callback(new Error(rule.message));
+        } else {
+          callback();
+        }
+      },
+    },
+  ],
+});
+
+// 验证详情
+const verifyDetailDialogVisible = ref(false);
+const verifyDetailList = ref([]);
 
 const filterParams = reactive({
   name: "",
@@ -235,13 +419,19 @@ const displayList = computed(() => {
   return filteredList.value.slice(start, start + pageParams.pageSize);
 });
 
+// 根据网站编码获取网站名称
+const getSiteNameByCode = (siteCode) => {
+  if (!siteCode) return "";
+  const site = siteConfigs.value.find((item) => item.siteCode === siteCode);
+  return site?.siteName || siteCode;
+};
+
 function getDefaultCreator() {
   const store = useUserStore();
   if (store?.username) return store.username;
   return localStorage.getItem("username") || "";
 }
 
-// index.vue 的 fetchCaseList 函数
 async function fetchCaseList() {
   loading.value = true;
   try {
@@ -253,9 +443,6 @@ async function fetchCaseList() {
       : Array.isArray(res?.data)
       ? res.data
       : [];
-    // 注释掉这行兜底逻辑（改后加的，没改之前没有）
-    // caseList.value = list.map((item) => ({...}));
-    // 改回原来的逻辑：
     caseList.value = list;
     pageParams.total = filteredList.value.length;
   } catch (err) {
@@ -267,11 +454,9 @@ async function fetchCaseList() {
   }
 }
 
-// 新增：加载元素列表
 async function fetchElementList() {
   try {
-    const res = await getElementList(); // 不传参，正确
-    // 兼容后端返回格式，赋值给ref的value
+    const res = await getElementList();
     elementList.value = res.data || res || [];
   } catch (err) {
     const errMsg =
@@ -279,7 +464,21 @@ async function fetchElementList() {
       err?.response?.statusText ||
       "加载元素列表失败";
     ElMessage.error(`加载元素列表失败：${errMsg}`);
-    elementList.value = []; // 空列表兜底
+    elementList.value = [];
+  }
+}
+
+async function fetchSiteConfigs() {
+  try {
+    const res = await getSiteConfigs();
+    siteConfigs.value = res.data || res || [];
+  } catch (err) {
+    const errMsg =
+      err?.response?.data?.msg ||
+      err?.response?.statusText ||
+      "加载网站配置失败";
+    ElMessage.error(`加载网站配置失败：${errMsg}`);
+    siteConfigs.value = [];
   }
 }
 
@@ -311,10 +510,17 @@ const formModel = reactive({
   url: "",
   description: "",
   creator: "",
-  // 新增：关联元素ID数组（多选）
   elementIds: [],
-  inputData: "", // 新增：输入数据
-  expectedResult: "", // 新增：预期结果
+  inputData: "",
+  expectedResult: "",
+  // 断言配置字段
+  assertType: "TEXT",
+  assertLocatorType: "id",
+  assertLocatorValue: "",
+  assertExpectedValue: "",
+  // 登录相关配置
+  needLogin: false,
+  siteCode: "",
 });
 
 const formRules = {
@@ -324,91 +530,177 @@ const formRules = {
   creator: [{ required: true, message: "请输入创建人", trigger: "blur" }],
   inputData: [
     { required: true, message: "请输入要填写的内容", trigger: "blur" },
-  ], // 新增
+  ],
   expectedResult: [
     { required: true, message: "请输入预期结果", trigger: "blur" },
-  ], // 新增
+  ],
+  assertType: [
+    { required: true, message: "请选择断言类型", trigger: "change" },
+  ],
+  assertLocatorType: [
+    { required: true, message: "请选择断言定位类型", trigger: "change" },
+  ],
+  assertLocatorValue: [
+    { required: true, message: "请输入断言定位值", trigger: "blur" },
+  ],
+  assertExpectedValue: [
+    {
+      required: true,
+      message: "文本断言需填写预期值",
+      trigger: "blur",
+      validator: (rule, value, callback) => {
+        if (formModel.assertType === "TEXT" && !value) {
+          callback(new Error(rule.message));
+        } else {
+          callback();
+        }
+      },
+    },
+  ],
+  siteCode: [
+    {
+      required: true,
+      message: "请选择关联测试网站",
+      trigger: "change",
+      validator: (rule, value, callback) => {
+        if (formModel.needLogin && !value) {
+          callback(new Error(rule.message));
+        } else {
+          callback();
+        }
+      },
+    },
+  ],
 };
 
 const dialogTitle = computed(() => (isEdit.value ? "编辑用例" : "新增用例"));
 
 function openAdd() {
-  // ① 重置表单（和系统管理一致）
   isEdit.value = false;
   formModel.id = null;
   formModel.name = "";
   formModel.url = "";
   formModel.description = "";
-  formModel.creator = "admin"; // 先固定值，避开getDefaultCreator的依赖
-  formModel.inputData = ""; // 新增：重置输入数据
-  formModel.expectedResult = ""; // 新增：重置预期结果
-  // 新增：重置关联元素
+  formModel.creator = "admin";
+  formModel.inputData = "";
+  formModel.expectedResult = "";
   formModel.elementIds = [];
-
-  // ② 直接显示弹窗（和系统管理一致）
+  // 初始化断言字段
+  formModel.assertType = "TEXT";
+  formModel.assertLocatorType = "id";
+  formModel.assertLocatorValue = "";
+  formModel.assertExpectedValue = "";
+  // 初始化登录配置
+  formModel.needLogin = false;
+  formModel.siteCode = "";
   dialogVisible.value = true;
-  // ③ 延迟清验证（等弹窗渲染完，和系统管理一致）
   setTimeout(() => {
     if (formRef.value) formRef.value.clearValidate();
   }, 100);
-  console.log("dialogVisible设置为：", dialogVisible.value);
 }
 
 function openEdit(row) {
-  console.log("点击了编辑按钮，执行openEdit，行数据：", row);
-  // ① 重置编辑状态+赋值
   isEdit.value = true;
   formModel.id = row.id;
   formModel.name = row.name || "";
   formModel.url = row.url || "";
   formModel.description = row.description || "";
-  formModel.creator = row.creator || "admin"; // 固定值，避开依赖
-  formModel.inputData = row.inputData || ""; // 新增：回显输入数据
-  formModel.expectedResult = row.expectedResult || ""; // 新增：回显预期结果
-  // 新增：回显关联元素（字符串转数组）
+  formModel.creator = row.creator || "admin";
+  formModel.inputData = row.inputData || "";
+  formModel.expectedResult = row.expectedResult || "";
   formModel.elementIds = row.elementIds
     ? row.elementIds.split(",").map((id) => Number(id))
     : [];
-
-  // ② 直接显示弹窗（和系统管理/新增按钮一致）
+  // 回显断言字段
+  formModel.assertType = row.assertType || "TEXT";
+  formModel.assertLocatorType = row.assertLocatorType || "id";
+  formModel.assertLocatorValue = row.assertLocatorValue || "";
+  formModel.assertExpectedValue = row.assertExpectedValue || "";
+  // 回显登录配置
+  formModel.needLogin = row.needLogin || false;
+  formModel.siteCode = row.siteCode || "";
   dialogVisible.value = true;
-
-  // ③ 延迟清验证（等弹窗渲染完）
   setTimeout(() => {
     if (formRef.value) formRef.value.clearValidate();
   }, 100);
-
-  console.log("dialogVisible设置为：", dialogVisible.value);
 }
 
-// 新增：执行用例的方法（适配后端参数格式）
-// 替换原有handleRunCase函数
-async function handleRunCase(row) {
-  if (!row.id) {
-    ElMessage.error("用例ID为空，无法执行");
+function openRunCaseDialog(row) {
+  // 保存当前选中的用例信息
+  currentCase.id = row.id;
+  currentCase.needLogin = row.needLogin || false;
+  currentCase.siteCode = row.siteCode || "";
+  currentCase.assertExpectedValue = row.assertExpectedValue || "";
+
+  // 初始化执行表单
+  runCaseForm.caseId = row.id;
+  runCaseForm.username = "";
+  runCaseForm.password = "";
+
+  runCaseDialogVisible.value = true;
+  setTimeout(() => {
+    if (runCaseFormRef.value) runCaseFormRef.value.clearValidate();
+  }, 100);
+}
+
+async function handleRunCaseSubmit() {
+  if (!runCaseFormRef.value) return;
+  try {
+    await runCaseFormRef.value.validate();
+  } catch (err) {
+    ElMessage.error("请填写所有必填字段");
     return;
   }
-  try {
-    ElMessage.info(`正在执行用例：${row.name}`);
-    const res = await runCase({ caseId: row.id });
-    console.log("后端返回的执行结果：", res);
 
-    // 优化：区分UNKNOWN（操作执行但未验证）和FAIL（真失败）
-    const execStatus = res.status || "UNKNOWN";
-    if (execStatus === "PASS") {
-      ElMessage.success(`用例执行成功：${row.name}，状态：${execStatus}`);
-    } else if (execStatus === "UNKNOWN") {
-      // UNKNOWN只是没验证结果，不是执行失败
-      ElMessage.warning(
-        `用例执行完成（未验证结果）：${row.name}，状态：${execStatus}`
-      );
-    } else {
-      // 只有status=FAIL才是真失败
-      ElMessage.error(`用例执行失败：${row.name}，状态：${execStatus}`);
+  runCaseLoading.value = true;
+  try {
+    ElMessage.info(`正在执行用例ID: ${runCaseForm.caseId}`);
+
+    // 构造执行请求体（仅传必要字段）
+    const requestData = {
+      caseId: runCaseForm.caseId,
+      username: runCaseForm.username,
+      password: runCaseForm.password,
+    };
+
+    const res = await runCase(requestData);
+    console.log("执行结果：", res);
+
+    // 解析验证详情
+    if (res.data?.verifyDetail) {
+      try {
+        const detailMap = JSON.parse(res.data.verifyDetail);
+        verifyDetailList.value = Object.entries(detailMap).map(
+          ([type, result]) => ({
+            type,
+            result,
+          })
+        );
+        verifyDetailDialogVisible.value = true;
+      } catch (e) {
+        verifyDetailList.value = [
+          { type: "解析失败", result: "无法解析验证详情" },
+        ];
+        verifyDetailDialogVisible.value = true;
+      }
     }
+
+    // 状态提示
+    const execStatus = res.data?.status || "UNKNOWN";
+    if (execStatus === "PASS") {
+      ElMessage.success(`用例执行成功，状态：${execStatus}`);
+    } else if (execStatus === "UNKNOWN") {
+      ElMessage.warning(`用例执行完成（未验证结果），状态：${execStatus}`);
+    } else {
+      ElMessage.error(`用例执行失败，状态：${execStatus}`);
+    }
+
+    runCaseDialogVisible.value = false;
   } catch (err) {
-    const errMsg = err?.message || "执行异常（网络/接口错误）";
-    ElMessage.error(`用例执行出错：${errMsg}`);
+    const errMsg = err?.response?.data?.msg || err?.message || "执行异常";
+    ElMessage.error(`执行失败：${errMsg}`);
+  } finally {
+    runCaseLoading.value = false;
   }
 }
 
@@ -417,17 +709,23 @@ async function handleSubmit() {
   try {
     await formRef.value.validate();
   } catch (err) {
-    // 新增：验证失败时明确提示用户
     ElMessage.error("请填写所有必填字段（用例名称/URL/步骤/创建人）");
     return;
   }
 
   submitLoading.value = true;
   try {
-    // 构造提交数据（把elementIds数组转成逗号分隔的字符串）
     const submitData = {
       ...formModel,
       elementIds: formModel.elementIds.join(",") || "",
+      // 传递断言字段
+      assertType: formModel.assertType,
+      assertLocatorType: formModel.assertLocatorType,
+      assertLocatorValue: formModel.assertLocatorValue,
+      assertExpectedValue: formModel.assertExpectedValue,
+      // 传递登录配置
+      needLogin: formModel.needLogin,
+      siteCode: formModel.siteCode,
     };
 
     if (isEdit.value) {
@@ -443,7 +741,7 @@ async function handleSubmit() {
     dialogVisible.value = false;
     fetchCaseList();
   } catch (err) {
-    // 错误提示在响应拦截器里处理
+    ElMessage.error(err?.response?.data?.msg || "操作失败");
   } finally {
     submitLoading.value = false;
   }
@@ -477,7 +775,6 @@ function formatDate(val) {
   return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
 }
 
-// 新增：初始化表格尺寸监听（根治ResizeObserver报错）
 function initTableResizeObserver() {
   if (!tableWrap.value) return;
   resizeObserver = new ResizeObserver((entries) => {
@@ -489,7 +786,6 @@ function initTableResizeObserver() {
   resizeObserver.observe(tableWrap.value);
 }
 
-// 新增：销毁表格尺寸监听（避免内存泄漏）
 function destroyTableResizeObserver() {
   if (resizeObserver) {
     resizeObserver.disconnect();
@@ -500,10 +796,10 @@ function destroyTableResizeObserver() {
 onMounted(() => {
   fetchCaseList();
   fetchElementList();
-  initTableResizeObserver(); // 初始化监听
+  fetchSiteConfigs();
+  initTableResizeObserver();
 });
 
-// 新增：组件卸载时销毁监听
 onUnmounted(() => {
   destroyTableResizeObserver();
 });
@@ -527,7 +823,6 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-// 新增：表格包裹容器样式（修复报错用）
 .table-wrap {
   width: 100%;
   min-height: 400px;

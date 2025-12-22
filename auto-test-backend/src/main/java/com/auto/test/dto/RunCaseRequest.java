@@ -1,20 +1,13 @@
 package com.auto.test.dto;
 
 import jakarta.validation.constraints.NotNull;
+import lombok.Data;
 
-/**
- * 执行用例请求体，仅需要传递用例主键 ID。
- */
+@Data
 public class RunCaseRequest {
-
     @NotNull(message = "用例ID不能为空")
     private Long caseId;
-
-    public Long getCaseId() {
-        return caseId;
-    }
-
-    public void setCaseId(Long caseId) {
-        this.caseId = caseId;
-    }
+    // 仅保留账号密码（敏感信息，执行时输入）
+    private String username; 
+    private String password;
 }
