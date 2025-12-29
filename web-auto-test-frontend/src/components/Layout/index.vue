@@ -90,15 +90,42 @@ onBeforeUnmount(() => {
 function handleLogout() {
   try {
     userStore.logout();
-  } catch (err) {
-    localStorage.removeItem("token");
+  } catch (e) {
+    // eslint-disable-next-line no-unused-vars
+    // 兜底清理，避免旧数据残留
+    ["token", "role", "username", "userInfo"].forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+      } catch (e) {
+        // eslint-disable-next-line no-unused-vars
+        // 忽略localStorage清理异常（如浏览器禁用存储）
+      }
+      try {
+        sessionStorage.removeItem(k);
+      } catch (e) {
+        // eslint-disable-next-line no-unused-vars
+        // 忽略sessionStorage清理异常（如浏览器禁用存储）
+      }
+    });
+  }
+  // 额外清理可能的会话缓存
+  try {
+    sessionStorage.clear();
+  } catch (e) {
+    // eslint-disable-next-line no-unused-vars
+    // 忽略sessionStorage清空异常（如浏览器禁用存储）
   }
   router.push("/login");
   ElMessage.success("退出成功");
 }
 
 function onMenuSelect(index) {
-  router.push({ name: index }).catch(() => {});
+  router
+    .push({ name: index })
+    // eslint-disable-next-line no-unused-vars
+    .catch((e) => {
+      // 忽略路由跳转异常（如路由不存在/重复跳转）
+    });
 }
 </script>
 

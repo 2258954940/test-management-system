@@ -23,6 +23,13 @@
           </el-form-item>
         </el-form>
       </div>
+
+      <div class="action-wrap">
+        <el-button type="primary" @click="handleExportExcel">
+          <el-icon style="margin-right: 6px"><Download /></el-icon>
+          导出Excel报告
+        </el-button>
+      </div>
     </div>
 
     <div class="stats-grid">
@@ -131,7 +138,9 @@ import {
 import CommonQueryForm from "@/components/CommonQueryForm.vue";
 import CommonPagination from "@/components/CommonPagination.vue";
 import * as echarts from "echarts";
-// import { ElMessage } from "element-plus";
+import { ElMessage } from "element-plus";
+import { exportExcel } from "@/api/report";
+import { Download } from "@element-plus/icons-vue";
 
 // 模拟用例数据（与用例管理保持一致）
 const caseOptions = ref([]);
@@ -148,6 +157,23 @@ function initCases() {
   caseOptions.value.forEach((c) => {
     caseMap[c.id] = c;
   });
+}
+
+async function handleExportExcel() {
+  try {
+    const blob = await exportExcel();
+    const url = window.URL.createObjectURL(new Blob([blob]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `测试报告-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    ElMessage.success("导出成功");
+  } catch (err) {
+    ElMessage.error("导出失败，请稍后重试");
+  }
 }
 
 // 模拟任务调度数据（与 TaskSchedule 保持相近结构）

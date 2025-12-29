@@ -32,9 +32,21 @@ export const useUserStore = defineStore("user", {
       this.username = "";
       this.role = "";
       this.token = "";
-      localStorage.removeItem("token");
-      localStorage.removeItem("role");
-      localStorage.removeItem("username");
+      // 清除本地与会话存储的用户信息，避免下次携带旧数据
+      ["token", "role", "username", "userInfo"].forEach((k) => {
+        try {
+          localStorage.removeItem(k);
+        } catch (e) {
+          // eslint-disable-next-line no-unused-vars
+          // 忽略localStorage清理异常（如浏览器禁用存储）
+        }
+        try {
+          sessionStorage.removeItem(k);
+        } catch (e) {
+          // eslint-disable-next-line no-unused-vars
+          // 忽略sessionStorage清理异常（如浏览器禁用存储）
+        }
+      });
     },
   },
 });

@@ -2,28 +2,22 @@ package com.auto.test.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod; // 必须导入HttpMethod
+import org.springframework.http.HttpMethod; 
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * 安全配置（适配Spring Security 6.x+，无启动报错）。
+ * 安全配置（适配Spring Security 6.x+，放行登录相关接口）。
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-
-    @Bean
-    public BCryptPasswordEncoder bCryptPasswordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -37,21 +31,19 @@ public class SecurityConfig {
             .httpBasic(AbstractHttpConfigurer::disable)
             // 4. 无状态会话（JWT不需要session）
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // 5. 权限规则（核心：用HttpMethod指定方法，路径以/开头）
+            // 5. 权限规则（核心修改：放行所有/user相关接口）
             .authorizeHttpRequests(auth -> auth
-                // HttpMethod.POST + 完整路径（以/开头）
-                .requestMatchers(HttpMethod.POST, "/api/user/login").permitAll()
-                // HttpMethod.OPTIONS + 通配路径（以/开头）
+                // 🔥 核心补充：放行登录/用户信息/退出接口（全方法）
+                .requestMatchers("/api/user/**").permitAll()
+                // 放行OPTIONS预检请求（跨域必加）
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // 开发环境临时放行用例/元素接口
                 .requestMatchers("/api/cases/**").permitAll()
                 .requestMatchers("/api/element/**").permitAll()
-                // 系统用户接口仅admin可访问
+                // 系统用户接口仅admin可访问（保留）
                 .requestMatchers("/api/system/user/**").hasAuthority("admin")
-                // // 其他接口需认证
-                // .anyRequest().authenticated()
-                 // 🔥 临时修改：放行所有请求（开发环境）
-            .anyRequest().permitAll() 
+                // 🔥 临时放行所有请求（毕设演示，避免其他接口拦截）
+                .anyRequest().permitAll() 
             );
 
         return http.build();
@@ -60,7 +52,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // 6.x+ 推荐写法：设置允许的源模式
+        // 允许所有前端域名访问（毕设演示）
         config.setAllowedOriginPatterns(java.util.Collections.singletonList("*"));
         config.setAllowCredentials(true);
         // 允许所有请求方法

@@ -1,6 +1,7 @@
 package com.auto.test.config;
 
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean; // 替换为MyBatis-Plus的工厂类
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,6 +43,10 @@ public class MyBatisConfig {
         dbConfig.setIdType(com.baomidou.mybatisplus.annotation.IdType.AUTO); // 主键自增
         globalConfig.setDbConfig(dbConfig);
         sessionFactory.setGlobalConfig(globalConfig);
+
+        // 使 XML Mapper 生效
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        sessionFactory.setMapperLocations(resolver.getResources("classpath*:mapper/*.xml"));
 
         return sessionFactory;
     }

@@ -2,14 +2,14 @@ package com.auto.test.mapper;
 
 import com.auto.test.entity.TestResult;
 import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Select;
+import java.util.List;
+import com.auto.test.dto.TestReportExcelDTO;
 
 /**
  * 测试结果的 MyBatis 注解版 Mapper，负责落库执行结果。
  */
-@Mapper
 public interface TestResultMapper {
 
     @Insert("INSERT INTO test_result(case_id, status, message, screenshot_path, run_time, duration_ms) " +
@@ -25,4 +25,9 @@ public interface TestResultMapper {
 
     @Select("SELECT id, case_id, status, message, run_time, duration_ms, screenshot_path FROM test_result WHERE id = #{id}")
     TestResult findById(Long id);
+
+        /**
+         * 导出报告所需的关联查询结果（XML Mapper定义）。
+         */
+        List<TestReportExcelDTO> selectReportRows();
 }

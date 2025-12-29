@@ -4,47 +4,33 @@ import { ElMessage } from "element-plus";
 import router from "@/router";
 import { useUserStore } from "@/store";
 
-// ========== 注释掉重复请求拦截（临时） ==========
-// const pendingRequestMap = new Map();
-// function getRequestKey(config) { ... }
-// function addPending(config) { ... }
-// function removePending(config) { ... }
-// ===============================================
-
 // 创建Axios实例
-// src/utils/request.js
 const service = axios.create({
-  baseURL: process.env.VUE_APP_API_BASE_URL || "/api", // 加回/api前缀，和Postman一致
+  baseURL: process.env.VUE_APP_API_BASE_URL || "http://localhost:8000", // 修复baseURL：直接指向后端/api
   timeout: 30000,
   headers: {
     "Content-Type": "application/json;charset=utf-8",
   },
 });
 
-// 请求拦截器：只保留Token逻辑，注释重复请求
-// src/utils/request.js —— 仅修改「请求拦截器」这一段，其余代码不动！
-// src/utils/request.js —— 请求拦截器中添加日志
+// 请求拦截器：携带Token + 日志
 service.interceptors.request.use(
   (config) => {
-    console.log("请求URL:", config.url);
+    console.log("【请求URL】:", config.url);
     const isLoginRequest = config.url.includes("/user/login");
-    console.log("是否登录请求:", isLoginRequest);
+    console.log("【是否登录请求】:", isLoginRequest);
 
+    // 非登录请求，携带Token和Role
     if (!isLoginRequest) {
-      // 从localStorage取Token（确认有值）
       const token = localStorage.getItem("token") || "";
       const role = localStorage.getItem("role") || "";
 
-      // 🔥 核心修复：用普通对象覆盖headers，彻底绕过AxiosHeaders不可变限制
-      config.headers = {
-        "Content-Type": "application/json;charset=utf-8", // 保留默认Content-Type
-        ...(token ? { Authorization: `Bearer ${token}` } : {}), // 加Token
-        ...(role ? { "X-Role": role } : {}), // 加角色
-      };
+      // 修复请求头：简单赋值，避免AxiosHeaders不可变问题
+      if (token) config.headers["Authorization"] = token;
+      if (role) config.headers["X-Role"] = role;
     }
 
-    // 打印最终请求头（此时应该能看到Token）
-    console.log("最终请求头:", config.headers);
+    console.log("【最终请求头】:", config.headers);
     return config;
   },
   (error) => {
@@ -52,12 +38,19 @@ service.interceptors.request.use(
     return Promise.reject(error);
   }
 );
-// 响应拦截器：注释重复请求移除逻辑
+
+// 响应拦截器：统一处理响应和错误
 service.interceptors.response.use(
   (response) => {
+    // ########### 新增：优先判断blob类型，直接返回，不做JSON解析 ###########
+    if (response.data instanceof Blob) {
+      return response.data;
+    }
     const res = response.data;
+    // 非200状态码统一处理
     if (res.code !== 200) {
       if (res.code === 401) {
+        // 登录过期，清理用户信息
         try {
           const userStore = useUserStore();
           if (userStore && typeof userStore.logout === "function") {
@@ -75,41 +68,31 @@ service.interceptors.response.use(
       }
       return Promise.reject(res);
     }
+    // 200状态码，返回完整响应（包含code/data/msg）
     return res;
   },
   (error) => {
-    // if (error?.config) { removePending(error.config); } // 注释掉这行
-
-    if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
-      return Promise.reject(error);
-    }
-
     const status = error?.response?.status;
     const resMsg = error?.response?.data?.msg;
 
-    // 重点：区分真实403和其他错误，避免误提示
+    // 按状态码精准提示
     if (status === 401) {
       try {
         const userStore = useUserStore();
-        if (userStore && typeof userStore.logout === "function") {
-          userStore.logout();
-        }
+        if (userStore) userStore.logout();
       } catch (err) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("role");
-        localStorage.removeItem("username");
+        localStorage.clear();
       }
       ElMessage.error("登录已过期，请重新登录");
       router.push("/login");
     } else if (status === 403) {
       ElMessage.error(resMsg || "无权限访问该资源");
     } else if (status === 404) {
-      // 404单独提示：接口路径错误（不是无权限）
-      ElMessage.error("接口路径错误，请检查后端接口是否存在");
+      ElMessage.error("接口不存在，请检查后端接口路径");
     } else if (status === 500) {
       ElMessage.error(resMsg || "服务器内部错误，请稍后重试");
     } else {
-      ElMessage.error(resMsg || "网络错误，请检查网络后重试");
+      ElMessage.error(resMsg || "网络错误，请检查网络连接");
     }
 
     return Promise.reject(error);

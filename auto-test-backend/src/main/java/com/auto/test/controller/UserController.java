@@ -30,9 +30,8 @@ public class UserController {
     @PostMapping("/user/login")
     public ApiResponse<Map<String, Object>> login(@RequestBody Map<String, String> payload) {
         try {
-
-         System.out.println("前端传的用户名：" + payload.get("username"));
-         System.out.println("前端传的密码：" + payload.get("password"));
+            System.out.println("前端传的用户名：" + payload.get("username"));
+            System.out.println("前端传的密码：" + payload.get("password"));
 
             String username = payload.get("username");
             String password = payload.get("password");
@@ -43,8 +42,8 @@ public class UserController {
             if (user == null) {
                 return ApiResponse.badRequest("用户名不存在");
             }
-             // ========== 新增日志：打印数据库里的加密密码 ==========
-            System.out.println("数据库里的加密密码：" + user.getPassword());
+            System.out.println("数据库里的明文密码：" + user.getPassword()); // 修正日志备注
+            // 明文校验密码（已修改checkPassword逻辑）
             if (!userService.checkPassword(password, user.getPassword())) {
                 return ApiResponse.badRequest("密码错误");
             }
@@ -53,11 +52,46 @@ public class UserController {
             data.put("token", token);
             data.put("username", user.getUsername());
             data.put("role", user.getRole());
-            // 新增日志：打印返回的响应
-System.out.println("后端返回的响应：" + ApiResponse.success("登录成功", data));
+            System.out.println("后端返回的响应：code=200, data=" + data); // 修正日志打印
             return ApiResponse.success("登录成功", data);
         } catch (Exception ex) {
             return ApiResponse.error("服务器错误: " + ex.getMessage(), null);
+        }
+    }
+
+    /**
+     * 新增：获取当前用户信息（前端登录后会调用此接口）
+     */
+    @GetMapping("/user/info")
+    public ApiResponse<Map<String, Object>> getUserInfo(@RequestHeader("Authorization") String token) {
+        try {
+            // 毕设演示：简化逻辑，从token中提取用户名（实际生产需解析token）
+            if (!StringUtils.hasText(token) || !token.startsWith("admin-token-")) {
+                return ApiResponse.unauthorized("token无效");
+            }
+            // 假设token中包含用户名（演示用，实际需用JWT解析）
+            String username = "admin"; // 可改为从token解析，或从数据库查
+            User user = userService.getByUsername(username);
+            Map<String, Object> data = new HashMap<>();
+            data.put("username", user.getUsername());
+            data.put("role", user.getRole());
+            data.put("token", token);
+            return ApiResponse.success(data);
+        } catch (Exception ex) {
+            return ApiResponse.error("获取用户信息失败: " + ex.getMessage(), null);
+        }
+    }
+
+    /**
+     * 新增：退出登录（前端调用）
+     */
+    @PostMapping("/user/logout")
+    public ApiResponse<String> logout() {
+        try {
+            // 毕设演示：仅返回成功，生产环境需清理服务端token
+            return ApiResponse.success("退出成功", "ok");
+        } catch (Exception ex) {
+            return ApiResponse.error("退出失败: " + ex.getMessage(), null);
         }
     }
 
@@ -66,9 +100,9 @@ System.out.println("后端返回的响应：" + ApiResponse.success("登录成�
      */
     @GetMapping("/system/user/list")
     public ApiResponse<Map<String, Object>> list(
-        @RequestParam(defaultValue = "1") long pageNum,
-        @RequestParam(defaultValue = "10") long pageSize,
-        @RequestHeader(value = "X-Role", required = false) String roleHeader
+            @RequestParam(defaultValue = "1") long pageNum,
+            @RequestParam(defaultValue = "10") long pageSize,
+            @RequestHeader(value = "X-Role", required = false) String roleHeader
     ) {
         try {
             if (!isAdmin(roleHeader)) {
@@ -104,7 +138,8 @@ System.out.println("后端返回的响应：" + ApiResponse.success("登录成�
             if (existing != null) {
                 return ApiResponse.badRequest("用户名已存在");
             }
-            payload.setPassword(userService.encodePassword(payload.getPassword()));
+            // 毕设演示环境：暂存明文密码，生产环境需恢复加密逻辑
+            payload.setPassword(payload.getPassword());
             if (!StringUtils.hasText(payload.getRole())) {
                 payload.setRole("user");
             }
@@ -143,7 +178,8 @@ System.out.println("后端返回的响应：" + ApiResponse.success("登录成�
                 existing.setStatus(payload.getStatus());
             }
             if (StringUtils.hasText(payload.getPassword())) {
-                existing.setPassword(userService.encodePassword(payload.getPassword()));
+                // 毕设演示环境：暂存明文密码
+                existing.setPassword(payload.getPassword());
             }
             boolean ok = userService.updateById(existing);
             return ok ? ApiResponse.success("更新成功", "ok") : ApiResponse.error("更新失败", null);

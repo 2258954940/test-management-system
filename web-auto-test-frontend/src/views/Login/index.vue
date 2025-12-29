@@ -82,24 +82,24 @@ async function handleLogin() {
   loading.value = true;
 
   try {
+    // 调用登录接口（request.js的响应拦截器已处理，res是后端完整响应）
     const res = await login({
       username: form.username,
       password: form.password,
     });
 
-    // ========== 核心修改：适配响应拦截器的返回格式 ==========
-    // 现在res就是后端的data字段（{token, role, username}）
-    if (res?.token) {
-      // 存储用户信息到Pinia
+    // 核心修复：先判断后端响应码，再取data里的用户信息
+    if (res.code === 200 && res.data?.token) {
+      // 存储到Pinia
       userStore.login({
-        username: res.username,
-        role: res.role,
-        token: res.token,
+        username: res.data.username,
+        role: res.data.role,
+        token: res.data.token,
       });
-      // 回退存储到localStorage
-      localStorage.setItem("token", res.token);
-      localStorage.setItem("role", res.role);
-      localStorage.setItem("username", res.username);
+      // 兜底存储到localStorage
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("role", res.data.role);
+      localStorage.setItem("username", res.data.username);
 
       ElMessage.success("登录成功");
       router.push("/home");
@@ -107,8 +107,9 @@ async function handleLogin() {
       ElMessage.error("登录失败：未获取到有效登录信息");
     }
   } catch (err) {
+    // 精准捕获错误信息
     const errorMsg =
-      err?.response?.data?.msg || err.message || "登录失败，请重试";
+      err?.msg || err?.response?.data?.msg || err.message || "登录失败，请重试";
     ElMessage.error(errorMsg);
   } finally {
     loading.value = false;

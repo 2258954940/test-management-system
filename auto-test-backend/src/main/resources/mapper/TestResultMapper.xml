@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.auto.test.mapper.TestResultMapper">
+
+    <resultMap id="TestReportExcelResultMap" type="com.auto.test.dto.TestReportExcelDTO">
+        <result property="caseId" column="case_id"/>
+        <result property="caseName" column="case_name"/>
+        <result property="siteName" column="site_name"/>
+        <result property="executeStatus" column="execute_status"/>
+        <result property="executeTime" column="execute_time"/>
+        <result property="createTime" column="create_time"/>
+        <result property="failReason" column="fail_reason"/>
+        <result property="screenshotPath" column="screenshot_path"/>
+    </resultMap>
+
+    <select id="selectReportRows" resultMap="TestReportExcelResultMap">
+        SELECT
+            tr.case_id AS case_id,
+            tc.name AS case_name,
+            COALESCE(stc.site_name, '未知') AS site_name,
+            COALESCE(tr.status, '未知') AS execute_status,
+            COALESCE(tr.duration_ms, 0) AS execute_time,
+            tr.run_time AS create_time,
+            COALESCE(tr.message, '无') AS fail_reason,
+            COALESCE(tr.screenshot_path, '无') AS screenshot_path
+        FROM test_result tr
+        LEFT JOIN test_case tc ON tr.case_id = tc.id
+        LEFT JOIN site_test_config stc ON tc.site_code = stc.site_code
+        ORDER BY tr.run_time DESC
+    </select>
+</mapper>

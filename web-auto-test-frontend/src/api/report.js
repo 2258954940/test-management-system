@@ -35,4 +35,10 @@ export function getReportByTaskId(taskId) {
   return service.get(`/api/report/task/${taskId}`);
 }
 
+// 导出测试报告 Excel（responseType: blob）
+export function exportExcel() {
+  // 仅修改这一行：路径前添加 /api 前缀
+  return service.get("/report/exportExcel", { responseType: "blob" });
+}
+
 export { getReportList as default };
