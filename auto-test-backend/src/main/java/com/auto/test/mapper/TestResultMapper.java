@@ -3,6 +3,7 @@ package com.auto.test.mapper;
 import com.auto.test.entity.TestResult;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import java.util.List;
 import com.auto.test.dto.TestReportExcelDTO;
@@ -30,4 +31,6 @@ public interface TestResultMapper {
          * 导出报告所需的关联查询结果（XML Mapper定义）。
          */
         List<TestReportExcelDTO> selectReportRows();
+
+    List<TestReportExcelDTO> selectReportRowsByTaskId(Long taskId);
 }

@@ -38,35 +38,34 @@ public class TestReportService {
     }
 
     /**
-     * 导出测试报告为 Excel。
-     * 备注：毕设演示用途，直接查询并导出，不做复杂权限控制。
+     * 导出测试报告为 Excel（按taskId筛选数据）
      */
-    public void exportTestReportExcel(HttpServletResponse response) {
+    public void exportTestReportExcel(HttpServletResponse response, Long taskId) { // 接收taskId
         try {
-            // 临时验证：跳过数据库查询，直接写占位行，确保Excel非0KB
-            // List<TestReportExcelDTO> rows = Collections.singletonList(buildPlaceholderRow());
-        // 1. 查询真实数据库数据
-        List<TestReportExcelDTO> rows = testResultMapper.selectReportRows();
-        
-        // 2. 空数据时用占位行兜底（保留，避免文件空白）
-        if (CollectionUtils.isEmpty(rows)) {
-            rows = Collections.singletonList(buildPlaceholderRow());
-        }
+            // 1. 按任务ID查询对应测试结果（核心修改）
+            List<TestReportExcelDTO> rows = testResultMapper.selectReportRowsByTaskId(taskId);
+            
+            // 2. 空数据时用占位行兜底
+            if (CollectionUtils.isEmpty(rows)) {
+                rows = Collections.singletonList(buildPlaceholderRow());
+            }
 
-            String fileName = URLEncoder.encode("测试报告.xlsx", StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+            // 3. 文件名加入taskId，区分不同任务的报告
+            String fileName = URLEncoder.encode("测试报告-任务" + taskId + ".xlsx", 
+                    StandardCharsets.UTF_8).replaceAll("\\+", "%20");
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
             response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + fileName);
 
             try (var out = response.getOutputStream()) {
                 EasyExcel.write(out, TestReportExcelDTO.class)
-                        .sheet("测试报告")
+                        .sheet("测试报告-任务" + taskId) // 工作表名带taskId
                         .doWrite(rows);
                 out.flush();
             }
         } catch (Exception ex) {
-            log.error("导出测试报告Excel失败", ex);
-            // 返回明确的 JSON 错误，避免空响应
+            log.error("导出测试报告Excel失败（任务ID：{}）", taskId, ex);
+            // 返回明确的 JSON 错误
             try {
                 response.reset();
                 response.setCharacterEncoding(StandardCharsets.UTF_8.name());

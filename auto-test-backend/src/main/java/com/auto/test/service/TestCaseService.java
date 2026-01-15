@@ -10,8 +10,7 @@ import com.auto.test.mapper.TestCaseMapper;
 import com.auto.test.mapper.TestResultMapper;
 import com.auto.test.utils.AssertUtil;
 import com.auto.test.utils.SeleniumUtil;
-import io.restassured.RestAssured;
-import io.restassured.path.json.JsonPath;
+
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;

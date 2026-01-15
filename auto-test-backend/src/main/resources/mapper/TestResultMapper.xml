@@ -28,4 +28,20 @@
         LEFT JOIN site_test_config stc ON tc.site_code = stc.site_code
         ORDER BY tr.run_time DESC
     </select>
+    <!-- 新增：按任务ID查询测试结果 -->
+<select id="selectReportRowsByTaskId" parameterType="java.lang.Long" resultType="com.auto.test.dto.TestReportExcelDTO">
+    SELECT 
+        tr.case_id as caseId,
+        tc.name as caseName, 
+        COALESCE(stc.site_name, '未知') as siteName,
+        tr.status as executeStatus, 
+        tr.duration_ms as executeTime,
+        tr.run_time as createTime, 
+        tr.message as failReason,
+        tr.screenshot_path as screenshotPath
+    FROM test_result tr
+    LEFT JOIN test_case tc ON tr.case_id = tc.id
+    LEFT JOIN site_test_config stc ON tc.site_code = stc.site_code 
+    WHERE tr.task_id = #{taskId}
+</select>
 </mapper>

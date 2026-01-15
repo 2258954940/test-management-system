@@ -60,19 +60,23 @@
         class="task-table"
       >
         <el-table-column prop="id" label="任务ID" width="100" />
-        <el-table-column prop="name" label="任务名称" />
-        <el-table-column prop="caseIds" label="关联用例">
+        <el-table-column prop="taskName" label="任务名称" />
+        <el-table-column prop="caseId" label="关联用例">
           <template #default="{ row }">
             <div class="case-names">
-              <el-tag v-for="cid in row.caseIds" :key="cid" type="info">{{
-                caseMap[cid]?.name || cid
-              }}</el-tag>
+              <el-tag
+                v-for="cid in row.caseId.split(',')"
+                :key="cid"
+                type="info"
+              >
+                {{ caseMap[cid]?.name || cid }}
+              </el-tag>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="mode" label="执行方式" width="120">
+        <el-table-column prop="execType" label="执行方式" width="120">
           <template #default="{ row }">{{
-            row.mode === "immediate" ? "立即" : "定时"
+            row.execType === "immediate" ? "立即" : "定时"
           }}</template>
         </el-table-column>
         <el-table-column prop="status" label="执行状态" width="120">
@@ -136,51 +140,47 @@
 </template>
 
 <script setup>
-// 1. 新增导入 watch（解决watch未定义问题）
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import CommonPagination from "@/components/CommonPagination.vue";
 import { ElMessage } from "element-plus";
+// 导入真实接口（替换模拟数据）
+import {
+  getTaskList,
+  createTask as apiCreateTask,
+  runTask as apiRunTask,
+  stopTask as apiStopTask,
+  getTaskLog,
+} from "@/api/task";
+import { getCaseList } from "@/api/case"; // 补充用例列表接口
 
-// 引用用例管理的模拟用例数据（若未生成，这里也做本地模拟）
+// 用例列表（真实接口）
 const caseOptions = ref([]);
 const caseMap = reactive({});
 
-function genCaseOptions(n = 15) {
-  const arr = [];
-  for (let i = 1; i <= n; i++) {
-    arr.push({ id: i, name: `用例-${i}` });
-  }
-  return arr;
-}
-
-// 构建映射
-function initCases() {
-  caseOptions.value = genCaseOptions(15);
-  caseOptions.value.forEach((c) => {
-    caseMap[c.id] = c;
-  });
-}
-
-// 任务数据模拟
-function genTasks(n = 10) {
-  const modes = ["immediate", "timed"];
-  const statuses = ["pending", "running", "finished", "failed"];
-  const arr = [];
-  for (let i = 1; i <= n; i++) {
-    arr.push({
-      id: i,
-      name: `任务-${i}`,
-      caseIds: [((i - 1) % 15) + 1],
-      mode: modes[i % modes.length],
-      status: statuses[i % statuses.length],
-      createTime: Date.now() - i * 3600 * 1000,
+// 初始化用例列表（调用后端接口）
+async function initCases() {
+  try {
+    const res = await getCaseList(); // 从后端获取真实用例
+    caseOptions.value = res.data || [];
+    caseOptions.value.forEach((c) => {
+      caseMap[c.id] = c;
+    });
+  } catch (err) {
+    ElMessage.error("获取用例列表失败，使用模拟数据");
+    // 接口失败时降级为模拟用例
+    const mockCases = [];
+    for (let i = 1; i <= 15; i++) {
+      mockCases.push({ id: i, name: `用例-${i}` });
+    }
+    caseOptions.value = mockCases;
+    mockCases.forEach((c) => {
+      caseMap[c.id] = c;
     });
   }
-  return arr;
 }
 
+// 任务列表（真实接口）
 const tasks = ref([]);
-
 const taskForm = reactive({
   name: "",
   caseIds: [],
@@ -188,18 +188,43 @@ const taskForm = reactive({
   date: null,
   time: null,
 });
-
 const taskPage = reactive({ pageNum: 1, pageSize: 5, total: 0 });
-
 const logDialog = reactive({ visible: false, logs: [] });
 
-onMounted(() => {
-  initCases();
-  tasks.value = genTasks(10);
-  taskPage.total = tasks.value.length;
+// 获取任务列表（真实接口）
+async function loadTasks() {
+  try {
+    const res = await getTaskList({
+      pageNum: taskPage.pageNum,
+      pageSize: taskPage.pageSize,
+    });
+    tasks.value = res.data.records || [];
+    taskPage.total = res.data.total || 0;
+  } catch (err) {
+    ElMessage.error("获取任务列表失败，使用模拟数据");
+    // 接口失败时降级为模拟任务
+    const mockTasks = [];
+    for (let i = 1; i <= 10; i++) {
+      mockTasks.push({
+        id: i,
+        taskName: `任务-${i}`,
+        caseId: [((i - 1) % 15) + 1].join(","),
+        execType: i % 2 === 0 ? "immediate" : "timed",
+        status: i % 4 === 0 ? "finished" : "pending",
+        createTime: new Date(Date.now() - i * 3600 * 1000).toISOString(),
+      });
+    }
+    tasks.value = mockTasks;
+    taskPage.total = mockTasks.length;
+  }
+}
+
+onMounted(async () => {
+  await initCases();
+  await loadTasks();
 });
 
-// 2. 新增watch：监听tasks变化，同步更新total（解决computed副作用报错）
+// 监听任务列表变化，同步分页总数
 watch(
   () => tasks.value,
   (newTasks) => {
@@ -208,13 +233,15 @@ watch(
   { immediate: true }
 );
 
-// 3. 修复computed：只做纯计算，不修改外部变量
+// 分页计算（纯计算，无副作用）
 const pagedTasks = computed(() => {
   const start = (taskPage.pageNum - 1) * taskPage.pageSize;
   return tasks.value.slice(start, start + taskPage.pageSize);
 });
 
+// 日期格式化
 function formatDate(ts) {
+  if (!ts) return "-";
   const d = new Date(ts);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -225,6 +252,7 @@ function formatDate(ts) {
   return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
 }
 
+// 状态标签映射
 function statusLabel(s) {
   if (s === "pending") return "待执行";
   if (s === "running") return "执行中";
@@ -232,7 +260,6 @@ function statusLabel(s) {
   if (s === "failed") return "失败";
   return s;
 }
-
 function statusTag(s) {
   if (s === "pending") return "";
   if (s === "running") return "info";
@@ -241,7 +268,8 @@ function statusTag(s) {
   return "";
 }
 
-function createTask() {
+// 创建任务（调用真实接口）
+async function createTask() {
   if (!taskForm.name || !taskForm.name.trim()) {
     ElMessage.error("任务名称必填");
     return;
@@ -250,65 +278,79 @@ function createTask() {
     ElMessage.error("请至少选择一个用例");
     return;
   }
-  const newId = tasks.value.length
-    ? Math.max(...tasks.value.map((t) => t.id)) + 1
-    : 1;
-  const createTime = Date.now();
-  tasks.value.unshift({
-    id: newId,
-    name: taskForm.name.trim(),
-    caseIds: [...taskForm.caseIds],
-    mode: taskForm.mode,
-    status: "pending",
-    createTime,
-  });
-  ElMessage.success("创建任务成功（模拟）");
-  // reset form
-  taskForm.name = "";
-  taskForm.caseIds = [];
-  taskForm.mode = "immediate";
-  taskForm.date = null;
-  taskForm.time = null;
+  try {
+    await apiCreateTask({
+      name: taskForm.name.trim(),
+      caseIds: taskForm.caseIds.join(","), // 转成逗号分隔的字符串
+      mode: taskForm.mode,
+      date: taskForm.date,
+      time: taskForm.time,
+    });
+    ElMessage.success("创建任务成功");
+    // 重置表单+刷新列表
+    taskForm.name = "";
+    taskForm.caseIds = [];
+    taskForm.mode = "immediate";
+    taskForm.date = null;
+    taskForm.time = null;
+    await loadTasks();
+  } catch (err) {
+    ElMessage.error("创建任务失败：" + (err.message || "未知错误"));
+  }
 }
 
-function refreshTasks() {
-  ElMessage.info("已刷新（模拟）");
+// 刷新任务列表
+async function refreshTasks() {
+  await loadTasks();
+  ElMessage.info("任务列表已刷新");
 }
 
-function runTask(row) {
-  const idx = tasks.value.findIndex((t) => t.id === row.id);
-  if (idx === -1) return;
-  tasks.value[idx].status = "running";
-  // 模拟执行，2s 后完成
-  setTimeout(() => {
-    tasks.value[idx].status = "finished";
-    ElMessage.success(`任务 ${row.name} 执行完成（模拟）`);
-  }, 2000);
+// 执行任务（调用真实接口）
+async function runTask(row) {
+  try {
+    await apiRunTask(row.id);
+    ElMessage.success(`任务 ${row.taskName} 开始执行`);
+    // 刷新列表
+    setTimeout(() => loadTasks(), 1000);
+  } catch (err) {
+    ElMessage.error("执行任务失败：" + (err.message || "未知错误"));
+  }
 }
 
-function stopTask(row) {
-  const idx = tasks.value.findIndex((t) => t.id === row.id);
-  if (idx === -1) return;
-  tasks.value[idx].status = "failed";
-  ElMessage.warning(`任务 ${row.name} 已终止（模拟）`);
+// 终止任务（调用真实接口）
+async function stopTask(row) {
+  try {
+    await apiStopTask(row.id);
+    ElMessage.warning(`任务 ${row.taskName} 已终止`);
+    // 刷新列表
+    setTimeout(() => loadTasks(), 1000);
+  } catch (err) {
+    ElMessage.error("终止任务失败：" + (err.message || "未知错误"));
+  }
 }
 
-// 4. 修复未使用变量警告：删掉forEach里未使用的i参数
-function viewLog(row) {
-  // 模拟日志
-  logDialog.logs = [`开始执行 ${row.name}`];
-  row.caseIds.forEach((cid) => {
-    // 删掉了未使用的i
-    const cname = caseMap[cid] ? caseMap[cid].name : `用例-${cid}`;
-    logDialog.logs.push(`执行用例 ${cname}：定位元素成功 → 操作成功`);
-  });
-  logDialog.logs.push(`任务执行结束`);
+// 查看日志（调用真实接口）
+async function viewLog(row) {
+  try {
+    const res = await getTaskLog(row.id);
+    logDialog.logs = res.data.logs || [`任务 ${row.taskName} 暂无日志`];
+  } catch (err) {
+    // 接口失败时用模拟日志
+    logDialog.logs = [`开始执行 ${row.taskName}`];
+    row.caseId.split(",").forEach((cid) => {
+      const cname = caseMap[cid] ? caseMap[cid].name : `用例-${cid}`;
+      logDialog.logs.push(`执行用例 ${cname}：定位元素成功 → 操作成功`);
+    });
+    logDialog.logs.push(`任务执行结束`);
+  }
   logDialog.visible = true;
 }
 
+// 分页切换
 function onTaskPageChange({ pageNum, pageSize }) {
   taskPage.pageNum = pageNum;
   taskPage.pageSize = pageSize;
+  loadTasks();
 }
 </script>
 

@@ -1,12 +1,9 @@
 package com.auto.test.entity;
 
 import java.time.LocalDateTime;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.time.LocalDateTime;
 /**
  * 测试执行结果实体，对应表 test_result。
  */

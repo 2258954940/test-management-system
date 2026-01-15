@@ -1,9 +1,9 @@
 package com.auto.test.controller;
 
-import com.auto.test.common.ApiResponse;
 import com.auto.test.service.TestReportService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,10 +21,14 @@ public class ReportController {
         this.testReportService = testReportService;
     }
 
+    // 新增@RequestParam接收前端传递的taskId
     @GetMapping("/exportExcel")
-    public void exportExcel(HttpServletResponse response) {
+    public void exportExcel(
+            HttpServletResponse response,
+            @RequestParam Long taskId // 接收前端的任务ID
+    ) {
         try {
-            testReportService.exportTestReportExcel(response);
+            testReportService.exportTestReportExcel(response, taskId); // 传递taskId给Service
         } catch (Exception e) {
             try {
                 response.reset();

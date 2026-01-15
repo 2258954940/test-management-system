@@ -6,7 +6,8 @@ import { useUserStore } from "@/store";
 
 // 创建Axios实例
 const service = axios.create({
-  baseURL: process.env.VUE_APP_API_BASE_URL || "http://localhost:8000", // 修复baseURL：直接指向后端/api
+  // 核心：指向后端的8000端口，且不带/api前缀
+  baseURL: "http://localhost:8000",
   timeout: 30000,
   headers: {
     "Content-Type": "application/json;charset=utf-8",

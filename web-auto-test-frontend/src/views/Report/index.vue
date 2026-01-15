@@ -16,7 +16,7 @@
               <el-option
                 v-for="t in finishedTasks"
                 :key="t.id"
-                :label="t.name"
+                :label="t.taskName"
                 :value="t.id"
               />
             </el-select>
@@ -141,17 +141,21 @@ import * as echarts from "echarts";
 import { ElMessage } from "element-plus";
 import { exportExcel } from "@/api/report";
 import { Download } from "@element-plus/icons-vue";
+// 1. 新增导入：真实任务列表接口
+import { getFinishedTasks } from "@/api/task";
 
-// 模拟用例数据（与用例管理保持一致）
+// 2. 替换模拟任务为真实接口数据
+const finishedTasks = ref([]); // 存储后端返回的已完成任务
+const selectedTaskId = ref(null);
+
+// 模拟用例数据（保留，兼容页面展示）
 const caseOptions = ref([]);
 const caseMap = reactive({});
-
 function genCaseOptions(n = 15) {
   const arr = [];
   for (let i = 1; i <= n; i++) arr.push({ id: i, name: `用例-${i}` });
   return arr;
 }
-
 function initCases() {
   caseOptions.value = genCaseOptions(15);
   caseOptions.value.forEach((c) => {
@@ -159,13 +163,20 @@ function initCases() {
   });
 }
 
+// 3. 修改导出方法：传递选中的taskId给后端
 async function handleExportExcel() {
+  if (!selectedTaskId.value) {
+    ElMessage.warning("请先选择一个已完成任务！");
+    return;
+  }
   try {
-    const blob = await exportExcel();
+    const blob = await exportExcel(selectedTaskId.value); // 传递taskId
     const url = window.URL.createObjectURL(new Blob([blob]));
     const link = document.createElement("a");
     link.href = url;
-    link.download = `测试报告-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    link.download = `测试报告-${new Date().toISOString().slice(0, 10)}-任务${
+      selectedTaskId.value
+    }.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -175,29 +186,6 @@ async function handleExportExcel() {
     ElMessage.error("导出失败，请稍后重试");
   }
 }
-
-// 模拟任务调度数据（与 TaskSchedule 保持相近结构）
-function genTasks(n = 12) {
-  const modes = ["immediate", "timed"];
-  const statuses = ["pending", "running", "finished", "failed"];
-  const arr = [];
-  for (let i = 1; i <= n; i++) {
-    arr.push({
-      id: i,
-      name: `任务-${i}`,
-      caseIds: [((i - 1) % 15) + 1, ((i + 2) % 15) + 1, ((i + 5) % 15) + 1],
-      mode: modes[i % modes.length],
-      status: i % 3 === 0 ? "finished" : statuses[i % statuses.length],
-      createTime: Date.now() - i * 3600 * 1000,
-    });
-  }
-  return arr;
-}
-
-const tasks = ref([]);
-
-// 选择的已完成任务 id
-const selectedTaskId = ref(null);
 
 // 报告列表（当前任务的所有记录）
 const allReports = ref([]);
@@ -216,9 +204,23 @@ const queryFields = [
   { label: "执行时间", key: "timeRange", type: "date-range" },
 ];
 
-onMounted(() => {
+// 4. 修改onMounted：优先加载真实任务
+onMounted(async () => {
   initCases();
-  tasks.value = genTasks(12);
+  // 调用后端接口获取真实已完成任务
+  try {
+    const res = await getFinishedTasks();
+    finishedTasks.value = res.data || [];
+  } catch (err) {
+    ElMessage.error("获取任务列表失败，使用模拟数据");
+    // 接口失败时降级为模拟任务
+    finishedTasks.value = [
+      { id: 1, taskName: "百度测试任务" },
+      { id: 2, taskName: "Swag Labs登录任务" },
+      { id: 3, taskName: "百度搜索自动化任务" },
+    ];
+  }
+
   // 选中第一个已完成任务
   const f = finishedTasks.value[0];
   selectedTaskId.value = f ? f.id : null;
@@ -236,25 +238,24 @@ onBeforeUnmount(() => {
   if (lineChart) lineChart.dispose();
 });
 
-const finishedTasks = computed(() =>
-  tasks.value.filter((t) => t.status === "finished")
-);
+// 5. 移除模拟tasks相关代码，直接使用finishedTasks
 
 watch(selectedTaskId, () => {
   generateReportsForSelected();
   page.pageNum = 1;
 });
 
+// 模拟生成当前任务的报告（后续可替换为真实接口）
 function generateReportsForSelected() {
-  const t = tasks.value.find((x) => x.id === selectedTaskId.value);
+  const t = finishedTasks.value.find((x) => x.id === selectedTaskId.value);
   if (!t) {
     allReports.value = [];
     filteredReports.value = [];
     page.total = 0;
     return;
   }
+  // 模拟数据：按任务ID生成对应报告
   allReports.value = genReportForTask(t);
-  // 初始不过滤
   filteredReports.value = [...allReports.value];
   page.total = filteredReports.value.length;
   updateStats();
@@ -262,18 +263,23 @@ function generateReportsForSelected() {
 }
 
 function genReportForTask(task) {
-  const totalCases = caseOptions.value.length;
   const arr = [];
-  const baseTime = task.createTime || Date.now();
-  for (let i = 1; i <= 12; i++) {
-    const cid = ((task.id + i - 2) % totalCases) + 1;
+  const baseTime = Date.now();
+  // 按任务ID匹配对应用例
+  let caseIds = [];
+  if (task.id === 1) caseIds = [16, 17]; // 百度测试任务
+  else if (task.id === 2) caseIds = [19]; // Swag Labs登录任务
+  else if (task.id === 3) caseIds = [18]; // 百度搜索任务
+  else caseIds = [((task.id - 1) % 15) + 1];
+
+  caseIds.forEach((cid, i) => {
     const cname = caseMap[cid] ? caseMap[cid].name : `用例-${cid}`;
     const success = Math.random() < 0.75;
     const duration = Math.floor(Math.random() * 1800) + 100;
     arr.push({
       id: `${task.id}-${i}`,
       taskId: task.id,
-      taskName: task.name,
+      taskName: task.taskName,
       caseId: cid,
       caseName: cname,
       status: success ? "success" : "failed",
@@ -281,7 +287,7 @@ function genReportForTask(task) {
       error: success ? "" : `元素未找到错误: 元素 #btn-${cid}`,
       execTime: baseTime + i * 60 * 1000,
     });
-  }
+  });
   return arr;
 }
 
@@ -311,7 +317,6 @@ const pctColorClass = computed(() => {
 });
 
 function handleSearch(form) {
-  // form: { taskName, timeRange }
   let res = [...allReports.value];
   if (form.taskName && form.taskName.trim()) {
     const kw = form.taskName.trim().toLowerCase();
@@ -399,17 +404,6 @@ function handleResize() {
   if (pieChart) pieChart.resize();
   if (lineChart) lineChart.resize();
 }
-
-// function formatTimestamp(ts) {
-//   const d = new Date(ts);
-//   const Y = d.getFullYear();
-//   const M = String(d.getMonth() + 1).padStart(2, "0");
-//   const D = String(d.getDate()).padStart(2, "0");
-//   const h = String(d.getHours()).padStart(2, "0");
-//   const m = String(d.getMinutes()).padStart(2, "0");
-//   const s = String(d.getSeconds()).padStart(2, "0");
-//   return `${Y}-${M}-${D} ${h}:${m}:${s}`;
-// }
 </script>
 
 <style scoped lang="less">
