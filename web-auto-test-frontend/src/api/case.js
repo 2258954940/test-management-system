@@ -4,7 +4,7 @@ import request from "@/utils/request";
 // 1. 查询所有用例（已正确，无需改）
 export function getCaseList() {
   return request({
-    url: "/cases", // 拼接后：/api/cases ✅
+    url: "/api/cases", // 统一加/api前缀
     method: "get",
   });
 }
@@ -12,7 +12,7 @@ export function getCaseList() {
 // 2. 新增用例（核心修改：补充/cases前缀）
 export function addCase(data) {
   return request({
-    url: "/cases/addCase", // 原：/addCase → 改后：/cases/addCase（拼接后/api/cases/addCase ✅）
+    url: "/api/cases/addCase", // 补齐/api前缀
     method: "post",
     data: data,
   });
@@ -21,7 +21,7 @@ export function addCase(data) {
 // 3. 编辑用例（核心修改：补充/cases前缀）
 export function updateCase(data) {
   return request({
-    url: `/cases/case/${data.id}`, // 原：/case/${data.id} → 改后：/cases/case/${id}（拼接后/api/cases/case/${id} ✅）
+    url: `/api/cases/case/${data.id}`, // 补齐/api前缀
     method: "put",
     data: data,
   });
@@ -30,7 +30,7 @@ export function updateCase(data) {
 // 4. 删除用例（核心修改：补充/cases前缀）
 export function deleteCase(id) {
   return request({
-    url: `/cases/case/${id}`, // 原：/case/${id} → 改后：/cases/case/${id}（拼接后/api/cases/case/${id} ✅）
+    url: `/api/cases/case/${id}`, // 补齐/api前缀
     method: "delete",
   });
 }
@@ -38,8 +38,9 @@ export function deleteCase(id) {
 // 5. 运行用例（核心修改：补充/cases前缀）
 export function runCase(data) {
   return request({
-    url: "/cases/runCase", // 原：/runCase → 改后：/cases/runCase（拼接后/api/cases/runCase ✅）
+    url: `/api/cases/run/${data.caseId}`, // 修改：按caseId路径 + 浏览器类型
     method: "post",
-    data: data, // 传 { caseId: 123 } 格式 ✅
+    params: { browserType: data.browserType || "edge" },
+    data: data, // { caseId, username, password, browserType }
   });
 }

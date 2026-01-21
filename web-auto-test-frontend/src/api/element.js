@@ -6,7 +6,7 @@ import service from "@/utils/request";
  * @param {Object} params { pageNum, pageSize, elementName, page, controlType }
  */
 export function getElementList() {
-  return service.get("/element");
+  return service.get("/api/element"); // 统一/api前缀
 }
 
 /**
@@ -23,7 +23,7 @@ export function addElement(data) {
     widgetType: data.controlType,
     createBy: "admin",
   };
-  return service.post("/element", reqData);
+  return service.post("/api/element", reqData); // 统一/api前缀
 }
 
 /**
@@ -41,7 +41,7 @@ export function updateElement(id, data) {
     widgetType: data.controlType,
     createBy: "admin",
   };
-  return service.put(`/element/${id}`, reqData);
+  return service.put(`/api/element/${id}`, reqData); // 统一/api前缀
 }
 
 /**
@@ -50,7 +50,7 @@ export function updateElement(id, data) {
  * @param {number|string} id 元素ID
  */
 export function deleteElement(id) {
-  return service.delete(`/element/${id}`);
+  return service.delete(`/api/element/${id}`); // 统一/api前缀
 }
 
 // ========== 1. 改：解析接口命名+字段适配（和前端调用对齐） ==========
@@ -61,7 +61,7 @@ export function deleteElement(id) {
  */
 export function parseUrlElements(data) {
   // 改名：parseElement → parseUrlElements（和前端调用一致）
-  return service.post("/element/parse", data);
+  return service.post("/api/element/parse", data); // 统一/api前缀
 }
 
 /**
@@ -79,7 +79,7 @@ export function batchImportElement(data) {
     widgetType: item.controlType, // 前端controlType → 后端widgetType
     createBy: "admin",
   }));
-  return service.post("/element/batchImport", { list: reqList });
+  return service.post("/api/element/batchImport", { list: reqList }); // 统一/api前缀
 }
 
 export { getElementList as default };

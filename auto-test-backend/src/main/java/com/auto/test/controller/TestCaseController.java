@@ -46,11 +46,18 @@ public class TestCaseController {
     /**
      * 扩展版：执行用例（支持纯UI/登录+API两种模式）
      */
-  @PostMapping("/runCase")
-public ApiResponse<TestResult> runCase(@Valid @RequestBody RunCaseRequest request) {
+    // 修改：执行用例接口，支持浏览器类型（默认edge）。路径保持兼容 /api/cases/runCase。
+    @PostMapping({"/runCase", "/run/{caseId}"})
+public ApiResponse<TestResult> runCase(@PathVariable(name = "caseId", required = false) Long pathCaseId,
+                                                                             @Valid @RequestBody RunCaseRequest request,
+                                                                             @RequestParam(name = "browserType", required = false, defaultValue = "edge") String browserType) {
     try {
-        // 1. 先查询用例，获取登录相关配置
-        TestCase testCase = testCaseService.findById(request.getCaseId());
+                Long targetCaseId = request.getCaseId() != null ? request.getCaseId() : pathCaseId;
+                if (targetCaseId == null) {
+                        return ApiResponse.error("用例ID不能为空", null);
+                }
+                // 1. 先查询用例，获取登录相关配置
+                TestCase testCase = testCaseService.findById(targetCaseId);
         if (testCase == null) {
             return ApiResponse.error("用例不存在", null);
         }
@@ -84,7 +91,8 @@ public ApiResponse<TestResult> runCase(@Valid @RequestBody RunCaseRequest reques
                 testCase.getNeedLogin(),
                 request.getUsername(),
                 request.getPassword(),
-                testCase.getAssertExpectedValue() // 断言预期值作为预期昵称
+                testCase.getAssertExpectedValue(),
+                browserType // 新增：传入浏览器类型
         );
 
         String msg = "执行完毕，状态: " + result.getStatus();

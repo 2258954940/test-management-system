@@ -226,6 +226,16 @@
         <el-form-item label="用例ID" prop="caseId">
           <el-input v-model="runCaseForm.caseId" disabled />
         </el-form-item>
+        <!-- 新增：浏览器选择，默认Edge -->
+        <el-form-item label="浏览器" prop="browserType">
+          <el-select
+            v-model="runCaseForm.browserType"
+            placeholder="请选择浏览器"
+          >
+            <el-option label="Edge" value="edge" />
+            <el-option label="Chrome" value="chrome" />
+          </el-select>
+        </el-form-item>
         <!-- 仅当用例需要登录时显示账号密码 -->
         <el-form-item
           label="测试账号"
@@ -335,6 +345,7 @@ const runCaseForm = reactive({
   caseId: "",
   username: "",
   password: "",
+  browserType: "edge", // 新增：浏览器选择，默认Edge
 });
 
 // 执行用例表单规则
@@ -367,6 +378,7 @@ const runCaseRules = reactive({
       },
     },
   ],
+  browserType: [],
 });
 
 // 验证详情
@@ -636,6 +648,7 @@ function openRunCaseDialog(row) {
   runCaseForm.caseId = row.id;
   runCaseForm.username = "";
   runCaseForm.password = "";
+  runCaseForm.browserType = "edge"; // 默认Edge
 
   runCaseDialogVisible.value = true;
   setTimeout(() => {
@@ -661,6 +674,7 @@ async function handleRunCaseSubmit() {
       caseId: runCaseForm.caseId,
       username: runCaseForm.username,
       password: runCaseForm.password,
+      browserType: runCaseForm.browserType,
     };
 
     const res = await runCase(requestData);

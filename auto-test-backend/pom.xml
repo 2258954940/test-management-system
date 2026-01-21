@@ -154,12 +154,12 @@
 			<scope>test</scope>
 		</dependency>
 
-		<!-- WebDriverManager（修复CVE漏洞） -->
-		<dependency>
-			<groupId>io.github.bonigarcia</groupId>
-			<artifactId>webdrivermanager</artifactId>
-			<version>6.1.0</version>
-		</dependency>
+
+			<dependency>
+				<groupId>io.github.bonigarcia</groupId>
+				<artifactId>webdrivermanager</artifactId>
+				<version>5.8.0</version> <!-- 升级到最新稳定版 -->
+			</dependency>
 	</dependencies>
 
 	<build>

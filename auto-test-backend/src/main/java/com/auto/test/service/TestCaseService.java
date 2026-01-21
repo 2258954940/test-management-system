@@ -95,7 +95,7 @@ public class TestCaseService {
     @Transactional
     public TestResult runTestCase(Long caseId) {
         SiteTestConfigDO defaultConfig = siteTestConfigService.getBySiteCode("BAIDU");
-        return runTestCase(caseId, defaultConfig, false, "", "", "");
+        return runTestCase(caseId, defaultConfig, false, "", "", "", "edge"); // 默认Edge
     }
 
     /**
@@ -104,8 +104,9 @@ public class TestCaseService {
      */
     @Transactional
     public TestResult runTestCase(Long caseId, SiteTestConfigDO siteConfig,
-                                  boolean needLogin, // 新增：是否需要登录
-                                  String username, String password, String expectedNickname) {
+                                  boolean needLogin, // 是否需要登录
+                                  String username, String password, String expectedNickname,
+                                  String browserType) {
         TestCase testCase = testCaseMapper.findById(caseId);
         if (testCase == null) {
             throw new IllegalArgumentException("用例不存在，ID=" + caseId);
@@ -125,7 +126,8 @@ public class TestCaseService {
                      siteConfig != null ? siteConfig.getSiteName() : "默认", needLogin);
 
             // 初始化驱动
-            driver = SeleniumUtil.createDriver(null, "edge");
+            // 修改：按传入浏览器类型动态创建驱动（默认edge），WebDriverManager自动管理驱动
+            driver = SeleniumUtil.getWebDriver(browserType);
             log.info("[驱动初始化成功] 浏览器版本：{}",
                      ((HasCapabilities) driver).getCapabilities().getBrowserVersion());
 
@@ -281,7 +283,7 @@ public class TestCaseService {
                 if (driver != null) {
                     try {
                         Thread.sleep(3000);
-                        driver.quit();
+                        SeleniumUtil.quitDriver(driver);
                         log.info("[驱动关闭] caseId={} 成功", caseId);
                     } catch (Exception ignored) {
                         log.warn("[驱动关闭] caseId={} 失败", caseId, ignored);

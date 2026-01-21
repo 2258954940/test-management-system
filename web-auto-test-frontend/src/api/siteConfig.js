@@ -9,7 +9,7 @@ import request from "@/utils/request";
  */
 export function getSiteConfigs() {
   return request({
-    url: "/cases/siteConfigs", // ✅ 正确路径，无需加/api
+    url: "/api/cases/siteConfigs", // 统一加/api前缀
     method: "get",
   });
 }
