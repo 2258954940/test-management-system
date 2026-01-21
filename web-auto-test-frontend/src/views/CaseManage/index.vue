@@ -234,6 +234,7 @@
           >
             <el-option label="Edge" value="edge" />
             <el-option label="Chrome" value="chrome" />
+            <el-option label="Firefox" value="firefox" />
           </el-select>
         </el-form-item>
         <!-- 仅当用例需要登录时显示账号密码 -->

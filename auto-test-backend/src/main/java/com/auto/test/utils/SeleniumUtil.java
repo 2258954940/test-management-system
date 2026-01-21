@@ -5,6 +5,8 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeOptions;
+import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.firefox.FirefoxOptions;
 import io.github.bonigarcia.wdm.WebDriverManager;
 import org.openqa.selenium.io.FileHandler;
 
@@ -20,7 +22,7 @@ import java.time.format.DateTimeFormatter;
  * Selenium 工具类（最终修复版）
  * 1. 保留WebDriverManager调用（满足毕设要求）
  * 2. 彻底禁用WebDriverManager联网，直接使用本地驱动
- * 3. 适配Chrome 144 + 项目自定义驱动目录
+ * 3. 适配Chrome 144 + Edge + Firefox 134 + 项目自定义驱动目录
  */
 public class SeleniumUtil {
 
@@ -34,17 +36,13 @@ public class SeleniumUtil {
 
     /**
      * 获取WebDriver实例（最终修复版）
-     * @param browserType 浏览器类型：chrome/edge（默认chrome）
+     * @param browserType 浏览器类型：chrome/edge/firefox（默认chrome）
      * @return WebDriver实例
      */
     public static WebDriver getWebDriver(String browserType) {
         String type = (browserType == null || browserType.isBlank()) ? "chrome" : browserType.toLowerCase();
         
         // 关键修复1：仅保留WebDriverManager调用语句（满足毕设要求），但不执行setup()（避免联网）
-        // 注释掉setup()，只保留声明，既满足毕设要求，又不触发联网
-        // WebDriverManager.chromedriver().setup(); 
-        // WebDriverManager.edgedriver().setup();   
-        // 替代方案：空调用，不触发任何逻辑
         try {
             Class.forName("io.github.bonigarcia.wdm.WebDriverManager"); // 仅加载类，满足调用要求
         } catch (ClassNotFoundException e) {
@@ -53,7 +51,6 @@ public class SeleniumUtil {
 
         try {
             // 关键修复2：直接指定本地驱动绝对路径（优先级最高，完全绕开WebDriverManager）
-            // ********** 替换成你本地的drivers目录绝对路径 **********
             String driverRootPath = "G:\\study\\test-management-system\\auto-test-backend\\src\\main\\resources\\drivers";
             // 验证目录是否存在
             File driverDir = new File(driverRootPath);
@@ -61,21 +58,24 @@ public class SeleniumUtil {
                 throw new RuntimeException("驱动目录不存在：" + driverRootPath);
             }
 
+            // 定义各浏览器驱动路径
             String chromeDriverFullPath = driverRootPath + File.separator + "chromedriver.exe";
             String edgeDriverFullPath = driverRootPath + File.separator + "msedgedriver.exe";
+            String firefoxDriverFullPath = driverRootPath + File.separator + "geckodriver.exe";
             
             // 打印驱动文件是否存在（关键排查日志）
             File chromeDriverFile = new File(chromeDriverFullPath);
+            File edgeDriverFile = new File(edgeDriverFullPath);
+            File firefoxDriverFile = new File(firefoxDriverFullPath);
             System.out.println("[关键日志] Chrome驱动文件是否存在：" + chromeDriverFile.exists());
-            System.out.println("[关键日志] Chrome驱动完整路径：" + chromeDriverFullPath);
+            System.out.println("[关键日志] Edge驱动文件是否存在：" + edgeDriverFile.exists());
+            System.out.println("[关键日志] Firefox驱动文件是否存在：" + firefoxDriverFile.exists());
 
             WebDriver webDriver = null;
             switch (type) {
                 case "chrome":
-                    // 关键修复3：强制指定驱动路径，完全不依赖WebDriverManager
-                    System.setProperty("webdriver.chrome.driver", chromeDriverFullPath);
-                    
                     // Chrome浏览器配置
+                    System.setProperty("webdriver.chrome.driver", chromeDriverFullPath);
                     ChromeOptions chromeOptions = new ChromeOptions();
                     chromeOptions.addArguments("--remote-allow-origins=*");
                     chromeOptions.addArguments("--start-maximized");
@@ -83,18 +83,15 @@ public class SeleniumUtil {
                     chromeOptions.addArguments("--disable-extensions");
                     chromeOptions.addArguments("--no-sandbox");
                     chromeOptions.addArguments("--disable-dev-shm-usage");
-                    // 可选：无头模式（如果本地运行有弹窗/权限问题）
-                    // chromeOptions.addArguments("--headless=new");
                     
-                    // 实例化驱动
                     System.out.println("[关键日志] 开始初始化ChromeDriver（本地驱动）...");
                     webDriver = new ChromeDriver(chromeOptions);
                     System.out.println("[关键日志] ChromeDriver初始化成功！");
                     break;
 
                 case "edge":
+                    // Edge浏览器配置
                     System.setProperty("webdriver.edge.driver", edgeDriverFullPath);
-                    
                     EdgeOptions edgeOptions = new EdgeOptions();
                     edgeOptions.setPageLoadStrategy(PageLoadStrategy.NORMAL);
                     edgeOptions.addArguments("--remote-allow-origins=*");
@@ -107,8 +104,23 @@ public class SeleniumUtil {
                     System.out.println("[关键日志] EdgeDriver初始化成功！");
                     break;
 
+                case "firefox":
+                    // Firefox浏览器配置（新增）
+                    System.setProperty("webdriver.gecko.driver", firefoxDriverFullPath);
+                    FirefoxOptions firefoxOptions = new FirefoxOptions();
+                    firefoxOptions.addArguments("--start-maximized");
+                    firefoxOptions.addArguments("--disable-infobars");
+                    // 解决Firefox跨域/权限问题
+                    firefoxOptions.addPreference("network.security.ports.banned.override", "");
+                    firefoxOptions.addPreference("browser.tabs.remote.autostart", false);
+                    
+                    System.out.println("[关键日志] 开始初始化FirefoxDriver（本地驱动）...");
+                    webDriver = new FirefoxDriver(firefoxOptions);
+                    System.out.println("[关键日志] FirefoxDriver初始化成功！");
+                    break;
+
                 default:
-                    throw new IllegalArgumentException("不支持的浏览器类型：" + type + "（仅支持chrome/edge）");
+                    throw new IllegalArgumentException("不支持的浏览器类型：" + type + "（仅支持chrome/edge/firefox）");
             }
             
             return webDriver;
