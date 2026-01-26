@@ -36,6 +36,19 @@ public class TestResultController {
         }
     }
 
+    @GetMapping("/results/by-task")
+    public ApiResponse<List<TestResult>> listResultsByTask(@RequestParam("taskId") Long taskId) {
+        try {
+            if (taskId == null) {
+                return ApiResponse.error("任务ID不能为空", null);
+            }
+            List<TestResult> results = testResultMapper.findByTaskId(taskId);
+            return ApiResponse.success("查询成功", results);
+        } catch (Exception ex) {
+            return ApiResponse.error("查询失败: " + ex.getMessage(), null);
+        }
+    }
+
     @GetMapping("/result/{id}")
     public ApiResponse<TestResult> getResult(@PathVariable Long id) {
         try {

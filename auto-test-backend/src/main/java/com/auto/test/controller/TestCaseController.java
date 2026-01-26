@@ -92,7 +92,8 @@ public ApiResponse<TestResult> runCase(@PathVariable(name = "caseId", required =
                 request.getUsername(),
                 request.getPassword(),
                 testCase.getAssertExpectedValue(),
-                browserType // 新增：传入浏览器类型
+            browserType, // 新增：传入浏览器类型
+            null // 单次执行无任务关联
         );
 
         String msg = "执行完毕，状态: " + result.getStatus();

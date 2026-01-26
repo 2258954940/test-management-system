@@ -1,19 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.auto.test.mapper.TaskMapper">
-    <!-- 查询已完成的任务 -->
+    <!-- 查询已完成的任务（和接口对应） -->
     <select id="selectFinishedTasks" resultType="com.auto.test.entity.Task">
         SELECT 
             id, 
-            task_name, 
-            case_id, -- 关键：把case_ids改成case_id（匹配数据库字段）
-            exec_type, 
-            cron_expression, 
+            task_name AS taskName, 
+            case_id AS caseId, 
+            exec_type AS execType, 
+            cron_expression AS cronExpression, 
             status, 
-            create_by, 
-            create_time
+            create_by AS createBy, 
+            create_time AS createTime
         FROM test_task
         WHERE status = 'finished' 
         ORDER BY create_time DESC
     </select>
+
+    <!-- 新增任务（和接口对应） -->
+    <insert id="insertTask" parameterType="com.auto.test.entity.Task">
+        INSERT INTO test_task(
+            task_name, 
+            case_id, 
+            exec_type, 
+            cron_expression, 
+            status, 
+            create_by
+        ) VALUES (
+            #{taskName}, 
+            #{caseId}, 
+            #{execType}, 
+            #{cronExpression}, 
+            #{status}, 
+            #{createBy}
+        )
+    </insert>
+
+    <!-- 更新任务状态（和接口对应） -->
+    <update id="updateTaskStatus">
+        UPDATE test_task 
+        SET status = #{status} 
+        WHERE id = #{id}
+    </update>
 </mapper>

@@ -13,6 +13,7 @@ public class TestResult {
 
     private Long id;
     private Long caseId;
+    private Long taskId; // 关联任务ID
     private String status;
     private String message;
     private String screenshotPath;

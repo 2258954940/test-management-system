@@ -30,6 +30,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 /**
  * 用例业务服务：新增、查询、更新、删除、执行（扩展UI+API组合验证+动态断言）。
  */
@@ -95,7 +99,7 @@ public class TestCaseService {
     @Transactional
     public TestResult runTestCase(Long caseId) {
         SiteTestConfigDO defaultConfig = siteTestConfigService.getBySiteCode("BAIDU");
-        return runTestCase(caseId, defaultConfig, false, "", "", "", "edge"); // 默认Edge
+        return runTestCase(caseId, defaultConfig, false, "", "", "", "edge", null); // 默认Edge
     }
 
     /**
@@ -106,7 +110,8 @@ public class TestCaseService {
     public TestResult runTestCase(Long caseId, SiteTestConfigDO siteConfig,
                                   boolean needLogin, // 是否需要登录
                                   String username, String password, String expectedNickname,
-                                  String browserType) {
+                                  String browserType,
+                                  Long taskId) {
         TestCase testCase = testCaseMapper.findById(caseId);
         if (testCase == null) {
             throw new IllegalArgumentException("用例不存在，ID=" + caseId);
@@ -115,6 +120,7 @@ public class TestCaseService {
         WebDriver driver = null;
         TestResult result = new TestResult();
         result.setCaseId(caseId);
+        result.setTaskId(taskId);
         result.setRunTime(LocalDateTime.now());
         long start = System.currentTimeMillis();
         Map<String, String> verifyDetail = new HashMap<>();
@@ -300,6 +306,109 @@ public class TestCaseService {
         return result;
     }
 
+            /**
+         * 批量执行测试用例（核心：驱动复用+失败重试+结果统计）
+         * 复用原有单条执行的所有逻辑（登录、断言、截图、结果保存），保证功能一致性
+         * @param caseIds 批量用例ID列表（Long类型，和你现有用例ID一致）
+         * @param browserType 执行浏览器（chrome/edge/firefox）
+         * @return 执行结果统计：total/success/fail/retrySuccess
+         */
+        public Map<String, Object> batchRunTestCases(List<Long> caseIds, String browserType, Long taskId) {
+            // 1. 初始化统计结果
+            int total = caseIds.size();
+            int success = 0; // 首次执行成功
+            int fail = 0;    // 重试后仍失败
+            int retrySuccess = 0; // 失败后重试成功
+            int retryCount = 1;   // 失败仅重试1次（可配置）
+            WebDriver driver = null;
+            // 获取默认站点配置（和你单条执行保持一致，用百度配置）
+            SiteTestConfigDO defaultConfig = siteTestConfigService.getBySiteCode("BAIDU");
+
+            try {
+                log.info("【批量执行开始】总用例数={}，执行浏览器={}，失败重试次数={}", total, browserType, retryCount);
+                // 2. 核心优化：只初始化1次浏览器驱动，所有用例复用（避免多次打开/关闭浏览器）
+                driver = SeleniumUtil.getWebDriver(browserType);
+                log.info("[批量驱动初始化成功] 浏览器版本：{}", ((HasCapabilities) driver).getCapabilities().getBrowserVersion());
+
+                // 3. 循环执行每个用例
+                for (Long caseId : caseIds) {
+                    boolean isExecuteSuccess = false;
+                    boolean isRetry = false; // 标记是否是重试执行
+                    log.info("【开始执行用例】caseId={}，剩余未执行={}", caseId, total - (success + fail + retrySuccess));
+
+                    // 4. 失败重试逻辑
+                    for (int i = 0; i <= retryCount; i++) {
+                        try {
+                            // 复用你原有单条执行的核心方法，保持所有逻辑（登录、断言、截图）一致
+                            // needLogin=false/用户名/密码为空：使用默认配置，不执行登录（和单条执行默认行为一致）
+                            TestResult testResult = this.runTestCase(caseId, defaultConfig, false, "", "", "", browserType, taskId);
+                            // 判定执行结果：PASS为成功，其他为失败
+                            if ("PASS".equals(testResult.getStatus())) {
+                                isExecuteSuccess = true;
+                                log.info("【用例执行成功】caseId={}（第{}次执行）", caseId, i+1);
+                                break;
+                            } else {
+                                throw new RuntimeException("用例执行结果为失败：" + testResult.getMessage());
+                            }
+                        } catch (Exception e) {
+                            log.error("【用例执行失败】caseId={}（第{}次执行），原因：{}", caseId, i+1, e.getMessage());
+                            // 重试次数用尽，标记为失败
+                            if (i == retryCount) {
+                                isExecuteSuccess = false;
+                                log.error("【用例重试失败】caseId={}，已重试{}次，放弃执行", caseId, retryCount);
+                            } else {
+                                isRetry = true;
+                                log.info("【开始重试用例】caseId={}，第{}次重试", caseId, i+2);
+                                // 重试前短暂延迟，避免操作过快
+                                Thread.sleep(1000);
+                            }
+                        }
+                    }
+
+                    // 5. 统计执行结果
+                    if (isExecuteSuccess) {
+                        if (isRetry) {
+                            retrySuccess++;
+                        } else {
+                            success++;
+                        }
+                    } else {
+                        fail++;
+                    }
+                    // 用例间短暂延迟，避免页面操作冲突
+                    Thread.sleep(1500);
+                }
+
+                log.info("【批量执行中间统计】总={}，首次成功={}，重试成功={}，失败={}", total, success, retrySuccess, fail);
+            } catch (Exception e) {
+                log.error("【批量执行整体异常】执行中断，原因：{}", e.getMessage(), e);
+            } finally {
+                // 6. 最终统一关闭浏览器驱动，释放资源（核心：驱动复用，只关一次）
+                if (driver != null) {
+                    try {
+                        Thread.sleep(3000);
+                        SeleniumUtil.quitDriver(driver);
+                        log.info("[批量驱动关闭成功] 所有用例执行完成，关闭浏览器");
+                    } catch (Exception ignored) {
+                        log.warn("[批量驱动关闭失败] 忽略异常：{}", ignored.getMessage());
+                    }
+                }
+                // 7. 最终统计结果校验（避免总数不一致）
+                int actualTotal = success + fail + retrySuccess;
+                if (actualTotal != total) {
+                    log.warn("【统计结果异常】总用例数={}，实际执行数={}，差异数={}", total, actualTotal, total - actualTotal);
+                }
+            }
+
+            // 8. 封装统计结果，返回给TaskService
+            Map<String, Object> resultMap = new HashMap<>();
+            resultMap.put("total", total);
+            resultMap.put("success", success);
+            resultMap.put("fail", fail);
+            resultMap.put("retrySuccess", retrySuccess);
+            log.info("【批量执行完成】最终统计：总={}，首次成功={}，重试成功={}，失败={}", total, success, retrySuccess, fail);
+            return resultMap;
+        }   
     /**
      * 纯UI登录验证（适配Swag Labs/百度等网站，去掉无用的API验证）
      */

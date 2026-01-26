@@ -9,27 +9,50 @@
         />
       </div>
 
-      <div class="select-wrap">
-        <el-form label-width="120px">
-          <el-form-item label="选择已完成任务">
-            <el-select v-model="selectedTaskId" placeholder="请选择已完成任务">
-              <el-option
-                v-for="t in finishedTasks"
-                :key="t.id"
-                :label="t.taskName"
-                :value="t.id"
-              />
-            </el-select>
-          </el-form-item>
-        </el-form>
-      </div>
-
       <div class="action-wrap">
         <el-button type="primary" @click="handleExportExcel">
           <el-icon style="margin-right: 6px"><Download /></el-icon>
           导出Excel报告
         </el-button>
       </div>
+    </div>
+
+    <!-- 任务概览列表 -->
+    <div class="task-overview">
+      <el-card class="area-card">
+        <div class="area-header">
+          <h4>任务概览</h4>
+        </div>
+        <el-table
+          :data="finishedTasks"
+          border
+          height="300"
+          style="width: 100%"
+          v-loading="isLoading"
+        >
+          <el-table-column prop="id" label="任务ID" width="100" />
+          <el-table-column prop="taskName" label="任务名称" />
+          <el-table-column label="执行时间" width="180">
+            <template #default="{ row }">{{
+              formatDate(row.createTime)
+            }}</template>
+          </el-table-column>
+          <el-table-column prop="totalCase" label="总用例数" width="100" />
+          <el-table-column prop="successCase" label="成功数" width="100" />
+          <el-table-column prop="failCase" label="失败数" width="100" />
+          <el-table-column prop="successRate" label="成功率" width="100" />
+          <el-table-column label="操作" width="140" align="center">
+            <template #default="{ row }">
+              <el-button
+                type="primary"
+                size="small"
+                @click="viewTaskDetails(row)"
+                >查看详情</el-button
+              >
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
     </div>
 
     <div class="stats-grid">
@@ -78,26 +101,34 @@
 
     <div class="bottom-row">
       <div class="table-area">
-        <el-card class="area-card">
+        <el-card class="area-card" v-loading="isLoading">
           <div class="area-header">
             <h4>执行结果</h4>
           </div>
-          <el-table :data="pagedReports" stripe style="width: 100%">
-            <el-table-column prop="caseId" label="用例ID" width="100" />
-            <el-table-column prop="caseName" label="用例名称" />
-            <el-table-column prop="status" label="执行状态" width="120">
-              <template #default="{ row }">
-                <el-tag
-                  :type="row.status === 'success' ? 'success' : 'danger'"
-                  >{{ row.status === "success" ? "成功" : "失败" }}</el-tag
-                >
-              </template>
-            </el-table-column>
-            <el-table-column prop="duration" label="耗时(ms)" width="140" />
-            <el-table-column prop="error" label="错误信息">
-              <template #default="{ row }">{{ row.error || "-" }}</template>
-            </el-table-column>
-          </el-table>
+          <template v-if="filteredReports.length > 0">
+            <el-table :data="pagedReports" stripe style="width: 100%">
+              <el-table-column prop="caseId" label="用例ID" width="100" />
+              <el-table-column prop="caseName" label="用例名称" />
+              <el-table-column prop="status" label="执行状态" width="120">
+                <template #default="{ row }">
+                  <el-tag
+                    :type="row.status === 'success' ? 'success' : 'danger'"
+                  >
+                    {{ row.status === "success" ? "成功" : "失败" }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="duration" label="耗时(ms)" width="140" />
+              <el-table-column prop="error" label="错误信息">
+                <template #default="{ row }">{{ row.error || "-" }}</template>
+              </el-table-column>
+            </el-table>
+          </template>
+          <template v-else>
+            <el-empty
+              description="请选择上方任务概览的「查看详情」加载用例执行结果"
+            />
+          </template>
         </el-card>
       </div>
 
@@ -132,7 +163,6 @@ import {
   computed,
   onMounted,
   onBeforeUnmount,
-  watch,
   nextTick,
 } from "vue";
 import CommonQueryForm from "@/components/CommonQueryForm.vue";
@@ -143,25 +173,13 @@ import { exportExcel } from "@/api/report";
 import { Download } from "@element-plus/icons-vue";
 // 1. 新增导入：真实任务列表接口
 import { getFinishedTasks } from "@/api/task";
+import service from "@/utils/request";
+import { formatDate } from "@/utils/date";
 
-// 2. 替换模拟任务为真实接口数据
-const finishedTasks = ref([]); // 存储后端返回的已完成任务
+// 2. 真实任务与加载状态
+const finishedTasks = ref([]);
 const selectedTaskId = ref(null);
-
-// 模拟用例数据（保留，兼容页面展示）
-const caseOptions = ref([]);
-const caseMap = reactive({});
-function genCaseOptions(n = 15) {
-  const arr = [];
-  for (let i = 1; i <= n; i++) arr.push({ id: i, name: `用例-${i}` });
-  return arr;
-}
-function initCases() {
-  caseOptions.value = genCaseOptions(15);
-  caseOptions.value.forEach((c) => {
-    caseMap[c.id] = c;
-  });
-}
+const isLoading = ref(false);
 
 // 3. 修改导出方法：传递选中的taskId给后端
 async function handleExportExcel() {
@@ -206,25 +224,14 @@ const queryFields = [
 
 // 4. 修改onMounted：优先加载真实任务
 onMounted(async () => {
-  initCases();
   // 调用后端接口获取真实已完成任务
   try {
     const res = await getFinishedTasks();
     finishedTasks.value = res.data || [];
   } catch (err) {
     ElMessage.error("获取任务列表失败，使用模拟数据");
-    // 接口失败时降级为模拟任务
-    finishedTasks.value = [
-      { id: 1, taskName: "百度测试任务" },
-      { id: 2, taskName: "Swag Labs登录任务" },
-      { id: 3, taskName: "百度搜索自动化任务" },
-    ];
+    finishedTasks.value = [];
   }
-
-  // 选中第一个已完成任务
-  const f = finishedTasks.value[0];
-  selectedTaskId.value = f ? f.id : null;
-  if (selectedTaskId.value) generateReportsForSelected();
   nextTick(() => {
     initCharts();
     updateCharts();
@@ -238,57 +245,53 @@ onBeforeUnmount(() => {
   if (lineChart) lineChart.dispose();
 });
 
-// 5. 移除模拟tasks相关代码，直接使用finishedTasks
+// 5. 真实数据：查看任务详情并拉取用例执行结果
+async function viewTaskDetails(row) {
+  if (!row || !row.id) return;
+  selectedTaskId.value = row.id;
+  await generateReportsForSelected(row.id);
+}
 
-watch(selectedTaskId, () => {
-  generateReportsForSelected();
-  page.pageNum = 1;
-});
-
-// 模拟生成当前任务的报告（后续可替换为真实接口）
-function generateReportsForSelected() {
-  const t = finishedTasks.value.find((x) => x.id === selectedTaskId.value);
-  if (!t) {
+async function generateReportsForSelected(taskId) {
+  isLoading.value = true;
+  try {
+    // 清空旧数据
     allReports.value = [];
     filteredReports.value = [];
     page.total = 0;
-    return;
-  }
-  // 模拟数据：按任务ID生成对应报告
-  allReports.value = genReportForTask(t);
-  filteredReports.value = [...allReports.value];
-  page.total = filteredReports.value.length;
-  updateStats();
-  nextTick(() => updateCharts());
-}
 
-function genReportForTask(task) {
-  const arr = [];
-  const baseTime = Date.now();
-  // 按任务ID匹配对应用例
-  let caseIds = [];
-  if (task.id === 1) caseIds = [16, 17]; // 百度测试任务
-  else if (task.id === 2) caseIds = [19]; // Swag Labs登录任务
-  else if (task.id === 3) caseIds = [18]; // 百度搜索任务
-  else caseIds = [((task.id - 1) % 15) + 1];
-
-  caseIds.forEach((cid, i) => {
-    const cname = caseMap[cid] ? caseMap[cid].name : `用例-${cid}`;
-    const success = Math.random() < 0.75;
-    const duration = Math.floor(Math.random() * 1800) + 100;
-    arr.push({
-      id: `${task.id}-${i}`,
-      taskId: task.id,
-      taskName: task.taskName,
-      caseId: cid,
-      caseName: cname,
-      status: success ? "success" : "failed",
-      duration,
-      error: success ? "" : `元素未找到错误: 元素 #btn-${cid}`,
-      execTime: baseTime + i * 60 * 1000,
+    // 请求真实接口 /api/results/by-task
+    const res = await service.get("/api/results/by-task", {
+      params: { taskId },
     });
-  });
-  return arr;
+    const list = Array.isArray(res.data) ? res.data : [];
+    const taskInfo = finishedTasks.value.find((t) => t.id === taskId) || {
+      taskName: "",
+    };
+
+    // 转换数据为页面需要的结构
+    const mapped = list.map((r, idx) => ({
+      id: r.id ?? `${taskId}-${idx}`,
+      taskId: r.taskId ?? taskId,
+      taskName: taskInfo.taskName,
+      caseId: r.caseId,
+      caseName: `用例-${r.caseId}`,
+      status: r.status === "PASS" ? "success" : "failed",
+      duration: r.durationMs ?? r.duration ?? 0,
+      error: r.status === "FAILED" ? r.message || "" : "",
+      execTime: r.runTime ? new Date(r.runTime).getTime() : Date.now(),
+    }));
+
+    allReports.value = mapped;
+    filteredReports.value = [...mapped];
+    page.total = filteredReports.value.length;
+    updateStats();
+    nextTick(() => updateCharts());
+  } catch (err) {
+    ElMessage.error("加载任务用例结果失败");
+  } finally {
+    isLoading.value = false;
+  }
 }
 
 const stats = reactive({
@@ -423,9 +426,7 @@ function handleResize() {
   flex: 1 1 600px;
 }
 
-.select-wrap {
-  width: 320px;
-}
+/* 移除旧下拉区域 */
 
 .stats-grid {
   display: grid;
@@ -499,6 +500,11 @@ function handleResize() {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
+/* 新增：任务概览与下方模块间距 */
+.task-overview {
+  margin-bottom: 20px;
+}
+
 .chart-card {
   height: 300px;
   display: flex;
@@ -527,9 +533,6 @@ function handleResize() {
   }
   .bottom-row {
     flex-direction: column;
-  }
-  .select-wrap {
-    width: 100%;
   }
 }
 
