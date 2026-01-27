@@ -122,10 +122,15 @@
       />
     </div>
 
+    <!-- 日志弹窗 终极修复版：强制显示+最高层级+body挂载+遮罩层正常 -->
     <el-dialog
-      v-model:visible="logDialog.visible"
+      v-model="logDialog.visible"
       width="600px"
       title="任务执行日志"
+      append-to-body
+      align-center
+      :close-on-click-modal="false"
+      :z-index="9999"
     >
       <div class="log-body">
         <ul>
@@ -140,10 +145,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from "vue";
+// 必须导入nextTick，用于强制触发视图更新
+import { ref, reactive, computed, onMounted, watch, nextTick } from "vue";
 import CommonPagination from "@/components/CommonPagination.vue";
 import { ElMessage } from "element-plus";
-// 导入真实接口（替换模拟数据）
+// 导入真实接口
 import {
   getTaskList,
   createTask as apiCreateTask,
@@ -151,23 +157,22 @@ import {
   stopTask as apiStopTask,
   getTaskLog,
 } from "@/api/task";
-import { getCaseList } from "@/api/case"; // 补充用例列表接口
+import { getCaseList } from "@/api/case";
 
 // 用例列表（真实接口）
 const caseOptions = ref([]);
 const caseMap = reactive({});
 
-// 初始化用例列表（调用后端接口）
+// 初始化用例列表
 async function initCases() {
   try {
-    const res = await getCaseList(); // 从后端获取真实用例
+    const res = await getCaseList();
     caseOptions.value = res.data || [];
     caseOptions.value.forEach((c) => {
       caseMap[c.id] = c;
     });
   } catch (err) {
     ElMessage.error("获取用例列表失败，使用模拟数据");
-    // 接口失败时降级为模拟用例
     const mockCases = [];
     for (let i = 1; i <= 15; i++) {
       mockCases.push({ id: i, name: `用例-${i}` });
@@ -189,9 +194,10 @@ const taskForm = reactive({
   time: null,
 });
 const taskPage = reactive({ pageNum: 1, pageSize: 5, total: 0 });
+// 核心恢复：改回最初的reactive定义，彻底解决渲染报错
 const logDialog = reactive({ visible: false, logs: [] });
 
-// 获取任务列表（真实接口）
+// 获取任务列表
 async function loadTasks() {
   try {
     const res = await getTaskList({
@@ -202,7 +208,6 @@ async function loadTasks() {
     taskPage.total = res.data.total || 0;
   } catch (err) {
     ElMessage.error("获取任务列表失败，使用模拟数据");
-    // 接口失败时降级为模拟任务
     const mockTasks = [];
     for (let i = 1; i <= 10; i++) {
       mockTasks.push({
@@ -233,7 +238,7 @@ watch(
   { immediate: true }
 );
 
-// 分页计算（纯计算，无副作用）
+// 分页计算
 const pagedTasks = computed(() => {
   const start = (taskPage.pageNum - 1) * taskPage.pageSize;
   return tasks.value.slice(start, start + taskPage.pageSize);
@@ -268,7 +273,7 @@ function statusTag(s) {
   return "";
 }
 
-// 创建任务（调用真实接口）
+// 创建任务
 async function createTask() {
   if (!taskForm.name || !taskForm.name.trim()) {
     ElMessage.error("任务名称必填");
@@ -281,13 +286,12 @@ async function createTask() {
   try {
     await apiCreateTask({
       name: taskForm.name.trim(),
-      caseIds: taskForm.caseIds.join(","), // 转成逗号分隔的字符串
+      caseIds: taskForm.caseIds.join(","),
       mode: taskForm.mode,
       date: taskForm.date,
       time: taskForm.time,
     });
     ElMessage.success("创建任务成功");
-    // 重置表单+刷新列表
     taskForm.name = "";
     taskForm.caseIds = [];
     taskForm.mode = "immediate";
@@ -305,45 +309,78 @@ async function refreshTasks() {
   ElMessage.info("任务列表已刷新");
 }
 
-// 执行任务（调用真实接口）
+// 执行任务
 async function runTask(row) {
   try {
     await apiRunTask(row.id);
     ElMessage.success(`任务 ${row.taskName} 开始执行`);
-    // 刷新列表
     setTimeout(() => loadTasks(), 1000);
   } catch (err) {
     ElMessage.error("执行任务失败：" + (err.message || "未知错误"));
   }
 }
 
-// 终止任务（调用真实接口）
+// 终止任务
 async function stopTask(row) {
   try {
     await apiStopTask(row.id);
     ElMessage.warning(`任务 ${row.taskName} 已终止`);
-    // 刷新列表
     setTimeout(() => loadTasks(), 1000);
   } catch (err) {
     ElMessage.error("终止任务失败：" + (err.message || "未知错误"));
   }
 }
 
-// 查看日志（调用真实接口）
+// 查看日志【全链路调试+nextTick优化+强制错误捕获+请求超时兜底】
 async function viewLog(row) {
+  console.log("===== 开始执行查看日志 =====");
+  console.log("任务行数据：", row);
+  if (!row || !row.id) {
+    ElMessage.warning("任务ID无效，无法获取日志");
+    console.log("===== 查看日志终止：任务ID无效 =====");
+    return;
+  }
+
+  console.log(`开始请求后端日志接口：/api/task/log/${row.id}`);
   try {
-    const res = await getTaskLog(row.id);
-    logDialog.logs = res.data.logs || [`任务 ${row.taskName} 暂无日志`];
+    // 强制设置请求超时（防止后端卡死，前端一直等）
+    const res = await Promise.race([
+      getTaskLog(row.id),
+      new Promise((_, reject) => {
+        setTimeout(
+          () => reject(new Error("请求超时：后端接口5秒未响应")),
+          5000
+        );
+      }),
+    ]);
+    // 打印后端返回的「完整响应数据」
+    console.log("后端接口响应成功，完整数据：", res);
+    const realLogs = res.data?.logs || [];
+    logDialog.logs =
+      realLogs.length > 0 ? realLogs : [`任务 ${row.taskName} 暂无执行日志`];
+    console.log("日志数据赋值完成：", logDialog.logs);
   } catch (err) {
-    // 接口失败时用模拟日志
+    // 打印「完整错误信息」（包括超时、404、500、网络错误）
+    console.error("后端接口请求失败/超时，错误详情：", err);
+    ElMessage.warning(
+      `获取日志失败：${err.message || "未知错误"}，展示模拟日志`
+    );
+    const caseIds = row.caseId ? row.caseId.split(",") : [];
     logDialog.logs = [`开始执行 ${row.taskName}`];
-    row.caseId.split(",").forEach((cid) => {
+    caseIds.forEach((cid) => {
       const cname = caseMap[cid] ? caseMap[cid].name : `用例-${cid}`;
       logDialog.logs.push(`执行用例 ${cname}：定位元素成功 → 操作成功`);
     });
     logDialog.logs.push(`任务执行结束`);
+    console.log("模拟日志赋值完成：", logDialog.logs);
   }
-  logDialog.visible = true;
+
+  // 优化nextTick：把弹窗设置放在回调里，100%确保视图更新
+  nextTick(() => {
+    logDialog.visible = true;
+    console.log("弹窗状态已设置为true：", logDialog.visible);
+    console.log("===== 查看日志执行结束 =====");
+  });
 }
 
 // 分页切换
@@ -390,5 +427,20 @@ function onTaskPageChange({ pageNum, pageSize }) {
 
 .case-names .el-tag {
   margin-right: 6px;
+}
+
+// 日志弹窗样式优化，加滚动条避免日志溢出
+.log-body {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 10px 0;
+  ul {
+    margin: 0;
+    padding-left: 20px;
+    li {
+      line-height: 1.8;
+      font-size: 14px;
+    }
+  }
 }
 </style>
