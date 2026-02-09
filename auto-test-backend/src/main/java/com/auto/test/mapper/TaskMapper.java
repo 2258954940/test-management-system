@@ -21,4 +21,5 @@ public interface TaskMapper extends BaseMapper<Task> {
     // 更新任务状态
     @Update("UPDATE test_task SET status = #{status} WHERE id = #{id}")
     int updateTaskStatus(Integer id, String status);
+    
 }

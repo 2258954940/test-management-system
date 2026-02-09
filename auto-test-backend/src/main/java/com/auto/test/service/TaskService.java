@@ -16,4 +16,9 @@ public interface TaskService extends IService<Task> {
     List<String> getTaskLog(Integer taskId);
     // 查询所有已完成任务并携带统计字段
     List<Task> listFinishedTasks();
+
+    Task getById(Integer id);
+    boolean updateById(Task task);
+    // 新增：删除任务接口
+    boolean deleteTask(Integer taskId);
 }

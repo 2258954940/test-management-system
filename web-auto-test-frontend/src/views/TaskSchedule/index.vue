@@ -4,7 +4,7 @@
       <h3>创建任务</h3>
       <el-form :model="taskForm" label-width="100px" class="task-form">
         <el-form-item label="任务名称">
-          <el-input v-model="taskForm.name" placeholder="请输入任务名称" />
+          <el-input v-model="taskForm.taskName" placeholder="请输入任务名称" />
         </el-form-item>
 
         <el-form-item label="关联用例">
@@ -23,22 +23,63 @@
         </el-form-item>
 
         <el-form-item label="执行方式">
-          <el-radio-group v-model="taskForm.mode">
+          <el-radio-group v-model="taskForm.executeType">
             <el-radio label="immediate">立即执行</el-radio>
-            <el-radio label="timed">定时执行</el-radio>
+            <el-radio label="timing">定时执行</el-radio>
           </el-radio-group>
         </el-form-item>
 
-        <div v-if="taskForm.mode === 'timed'" class="timed-row">
-          <el-form-item label="执行日期">
-            <el-date-picker
-              v-model="taskForm.date"
-              type="date"
-              placeholder="选择日期"
-            />
-          </el-form-item>
-          <el-form-item label="执行时间">
-            <el-time-picker v-model="taskForm.time" placeholder="选择时间" />
+        <!-- Cron表达式输入区域（纯Element Plus原生组件） -->
+        <div v-if="taskForm.executeType === 'timing'" class="timed-row">
+          <el-form-item label="定时规则">
+            <!-- 输入框+右侧快捷选择下拉框 -->
+            <div class="cron-input-wrapper">
+              <el-input
+                v-model="taskForm.cronExpression"
+                placeholder="请输入Cron表达式，或从右侧选择常用规则"
+                clearable
+                size="default"
+              >
+                <template #append>
+                  <el-select
+                    v-model="selectedPreset"
+                    placeholder="常用规则"
+                    @change="applyCronPreset"
+                    size="default"
+                    style="width: 140px"
+                  >
+                    <el-option label="每分钟" value="0 * * * * ?" />
+                    <el-option label="每5分钟" value="0 */5 * * * ?" />
+                    <el-option label="每10分钟" value="0 */10 * * * ?" />
+                    <el-option label="每30分钟" value="0 */30 * * * ?" />
+                    <el-option label="每小时" value="0 0 * * * ?" />
+                    <el-option label="每天0点" value="0 0 0 * * ?" />
+                    <el-option label="每天12点" value="0 0 12 * * ?" />
+                    <el-option label="每周一0点" value="0 0 0 ? * MON" />
+                  </el-select>
+                </template>
+              </el-input>
+            </div>
+            <!-- 规则提示+帮助链接 -->
+            <div class="cron-tip">
+              <span class="tip-label">当前规则：</span>
+              <el-tag
+                :type="taskForm.cronExpression ? 'info' : 'warning'"
+                size="small"
+              >
+                {{ taskForm.cronExpression || "未设置" }}
+              </el-tag>
+              <el-divider direction="vertical" />
+              <el-link
+                type="primary"
+                :href="cronHelperUrl"
+                target="_blank"
+                underline
+                style="font-size: 12px"
+              >
+                Cron表达式在线生成器
+              </el-link>
+            </div>
           </el-form-item>
         </div>
 
@@ -58,40 +99,57 @@
         stripe
         style="width: 100%"
         class="task-table"
+        border
       >
-        <el-table-column prop="id" label="任务ID" width="100" />
-        <el-table-column prop="taskName" label="任务名称" />
-        <el-table-column prop="caseId" label="关联用例">
+        <el-table-column prop="id" label="任务ID" width="100" align="center" />
+        <el-table-column prop="taskName" label="任务名称" min-width="150" />
+        <el-table-column prop="caseId" label="关联用例" min-width="200">
           <template #default="{ row }">
             <div class="case-names">
               <el-tag
                 v-for="cid in row.caseId.split(',')"
                 :key="cid"
                 type="info"
+                size="small"
               >
                 {{ caseMap[cid]?.name || cid }}
               </el-tag>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="execType" label="执行方式" width="120">
+        <el-table-column
+          prop="execType"
+          label="执行方式"
+          width="120"
+          align="center"
+        >
           <template #default="{ row }">{{
             row.execType === "immediate" ? "立即" : "定时"
           }}</template>
         </el-table-column>
-        <el-table-column prop="status" label="执行状态" width="120">
+        <el-table-column
+          prop="status"
+          label="执行状态"
+          width="120"
+          align="center"
+        >
           <template #default="{ row }">
-            <el-tag :type="statusTag(row.status)">{{
+            <el-tag :type="statusTag(row.status)" size="small">{{
               statusLabel(row.status)
             }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="200">
+        <el-table-column
+          prop="createTime"
+          label="创建时间"
+          width="200"
+          align="center"
+        >
           <template #default="{ row }">{{
             formatDate(row.createTime)
           }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="240">
+        <el-table-column label="操作" width="300" align="center">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="runTask(row)"
               >执行</el-button
@@ -110,6 +168,15 @@
               style="margin-left: 8px"
               >查看日志</el-button
             >
+            <!-- 删除按钮 -->
+            <el-button
+              type="danger"
+              size="small"
+              @click="deleteTask(row)"
+              style="margin-left: 8px"
+              icon="el-icon-delete"
+              >删除</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -119,13 +186,14 @@
         :pageNum="taskPage.pageNum"
         :pageSize="taskPage.pageSize"
         @onPageChange="onTaskPageChange"
+        style="margin-top: 16px; text-align: right"
       />
     </div>
 
-    <!-- 日志弹窗 终极修复版：强制显示+最高层级+body挂载+遮罩层正常 -->
+    <!-- 日志弹窗（修正标签嵌套） -->
     <el-dialog
       v-model="logDialog.visible"
-      width="600px"
+      width="800px"
       title="任务执行日志"
       append-to-body
       align-center
@@ -134,7 +202,9 @@
     >
       <div class="log-body">
         <ul>
-          <li v-for="(l, idx) in logDialog.logs" :key="idx">{{ l }}</li>
+          <li v-for="(l, idx) in logDialog.logs" :key="idx" class="log-item">
+            {{ l }}
+          </li>
         </ul>
       </div>
       <template #footer>
@@ -145,21 +215,30 @@
 </template>
 
 <script setup>
-// 必须导入nextTick，用于强制触发视图更新
 import { ref, reactive, computed, onMounted, watch, nextTick } from "vue";
 import CommonPagination from "@/components/CommonPagination.vue";
-import { ElMessage } from "element-plus";
-// 导入真实接口
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
   getTaskList,
   createTask as apiCreateTask,
   runTask as apiRunTask,
   stopTask as apiStopTask,
   getTaskLog,
+  deleteTask as apiDeleteTask, // 导入删除接口
 } from "@/api/task";
 import { getCaseList } from "@/api/case";
 
-// 用例列表（真实接口）
+// Cron快捷选择相关
+const selectedPreset = ref("");
+const cronHelperUrl = ref("https://cron.qqe2.com/");
+
+// 应用快捷选择的Cron规则
+const applyCronPreset = (value) => {
+  taskForm.cronExpression = value;
+  selectedPreset.value = "";
+};
+
+// 用例列表
 const caseOptions = ref([]);
 const caseMap = reactive({});
 
@@ -184,17 +263,15 @@ async function initCases() {
   }
 }
 
-// 任务列表（真实接口）
-const tasks = ref([]);
+// 任务表单 & 列表
 const taskForm = reactive({
-  name: "",
+  taskName: "",
   caseIds: [],
-  mode: "immediate",
-  date: null,
-  time: null,
+  executeType: "immediate",
+  cronExpression: "",
 });
+const tasks = ref([]);
 const taskPage = reactive({ pageNum: 1, pageSize: 5, total: 0 });
-// 核心恢复：改回最初的reactive定义，彻底解决渲染报错
 const logDialog = reactive({ visible: false, logs: [] });
 
 // 获取任务列表
@@ -214,7 +291,7 @@ async function loadTasks() {
         id: i,
         taskName: `任务-${i}`,
         caseId: [((i - 1) % 15) + 1].join(","),
-        execType: i % 2 === 0 ? "immediate" : "timed",
+        execType: i % 2 === 0 ? "immediate" : "timing",
         status: i % 4 === 0 ? "finished" : "pending",
         createTime: new Date(Date.now() - i * 3600 * 1000).toISOString(),
       });
@@ -223,20 +300,6 @@ async function loadTasks() {
     taskPage.total = mockTasks.length;
   }
 }
-
-onMounted(async () => {
-  await initCases();
-  await loadTasks();
-});
-
-// 监听任务列表变化，同步分页总数
-watch(
-  () => tasks.value,
-  (newTasks) => {
-    taskPage.total = newTasks.length;
-  },
-  { immediate: true }
-);
 
 // 分页计算
 const pagedTasks = computed(() => {
@@ -247,76 +310,114 @@ const pagedTasks = computed(() => {
 // 日期格式化
 function formatDate(ts) {
   if (!ts) return "-";
-  const d = new Date(ts);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const ss = String(d.getSeconds()).padStart(2, "0");
-  return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
+  try {
+    const d = new Date(ts);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    const ss = String(d.getSeconds()).padStart(2, "0");
+    return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
+  } catch (e) {
+    return "-";
+  }
 }
 
-// 状态标签映射
+// 状态映射
 function statusLabel(s) {
-  if (s === "pending") return "待执行";
-  if (s === "running") return "执行中";
-  if (s === "finished") return "已完成";
-  if (s === "failed") return "失败";
-  return s;
+  const statusMap = {
+    pending: "待执行",
+    running: "执行中",
+    finished: "已完成",
+    failed: "失败",
+  };
+  return statusMap[s] || s;
 }
+
 function statusTag(s) {
-  if (s === "pending") return "";
-  if (s === "running") return "info";
-  if (s === "finished") return "success";
-  if (s === "failed") return "danger";
-  return "";
+  const tagMap = {
+    pending: "warning",
+    running: "info",
+    finished: "success",
+    failed: "danger",
+  };
+  return tagMap[s] || "";
 }
 
 // 创建任务
 async function createTask() {
-  if (!taskForm.name || !taskForm.name.trim()) {
-    ElMessage.error("任务名称必填");
+  // 表单校验
+  if (!taskForm.taskName.trim()) {
+    ElMessage.error("任务名称不能为空！");
     return;
   }
-  if (!taskForm.caseIds || !taskForm.caseIds.length) {
-    ElMessage.error("请至少选择一个用例");
+  if (!taskForm.caseIds.length) {
+    ElMessage.error("请至少选择一个关联用例！");
     return;
   }
+  if (taskForm.executeType === "timing" && !taskForm.cronExpression.trim()) {
+    ElMessage.error("定时执行需填写有效的Cron表达式！");
+    return;
+  }
+
   try {
-    await apiCreateTask({
-      name: taskForm.name.trim(),
+    // 提交创建任务
+    const createRes = await apiCreateTask({
+      taskName: taskForm.taskName.trim(),
       caseIds: taskForm.caseIds.join(","),
-      mode: taskForm.mode,
-      date: taskForm.date,
-      time: taskForm.time,
+      executeType: taskForm.executeType,
+      cronExpression: taskForm.cronExpression.trim(),
     });
-    ElMessage.success("创建任务成功");
-    taskForm.name = "";
-    taskForm.caseIds = [];
-    taskForm.mode = "immediate";
-    taskForm.date = null;
-    taskForm.time = null;
+    const newTaskId = createRes.data?.id;
+
+    // 容错处理
+    if (!newTaskId) {
+      ElMessage.warning("任务创建成功，但未获取到任务ID，需手动执行");
+      resetTaskForm();
+      await loadTasks();
+      return;
+    }
+
+    ElMessage.success("任务创建成功！");
+
+    // 立即执行任务
+    if (taskForm.executeType === "immediate") {
+      await apiRunTask(newTaskId);
+      ElMessage.success("立即执行任务已触发！");
+    }
+
+    // 重置表单+刷新列表
+    resetTaskForm();
     await loadTasks();
   } catch (err) {
-    ElMessage.error("创建任务失败：" + (err.message || "未知错误"));
+    ElMessage.error(`创建任务失败：${err.message || "未知错误"}`);
   }
+}
+
+// 重置任务表单
+function resetTaskForm() {
+  taskForm.taskName = "";
+  taskForm.caseIds = [];
+  taskForm.executeType = "immediate";
+  taskForm.cronExpression = "";
+  selectedPreset.value = "";
 }
 
 // 刷新任务列表
 async function refreshTasks() {
   await loadTasks();
-  ElMessage.info("任务列表已刷新");
+  ElMessage.success("任务列表已刷新！");
 }
 
 // 执行任务
 async function runTask(row) {
   try {
     await apiRunTask(row.id);
-    ElMessage.success(`任务 ${row.taskName} 开始执行`);
+    ElMessage.success(`任务 ${row.taskName} 开始执行！`);
     setTimeout(() => loadTasks(), 1000);
   } catch (err) {
-    ElMessage.error("执行任务失败：" + (err.message || "未知错误"));
+    ElMessage.error(`执行任务失败：${err.message || "未知错误"}`);
   }
 }
 
@@ -324,63 +425,88 @@ async function runTask(row) {
 async function stopTask(row) {
   try {
     await apiStopTask(row.id);
-    ElMessage.warning(`任务 ${row.taskName} 已终止`);
+    ElMessage.warning(`任务 ${row.taskName} 已终止！`);
     setTimeout(() => loadTasks(), 1000);
   } catch (err) {
-    ElMessage.error("终止任务失败：" + (err.message || "未知错误"));
+    ElMessage.error(`终止任务失败：${err.message || "未知错误"}`);
   }
 }
 
-// 查看日志【全链路调试+nextTick优化+强制错误捕获+请求超时兜底】
+// 查看日志
 async function viewLog(row) {
-  console.log("===== 开始执行查看日志 =====");
-  console.log("任务行数据：", row);
   if (!row || !row.id) {
-    ElMessage.warning("任务ID无效，无法获取日志");
-    console.log("===== 查看日志终止：任务ID无效 =====");
+    ElMessage.warning("任务ID无效，无法获取日志！");
     return;
   }
 
-  console.log(`开始请求后端日志接口：/api/task/log/${row.id}`);
+  logDialog.logs = []; // 清空原有日志
   try {
-    // 强制设置请求超时（防止后端卡死，前端一直等）
     const res = await Promise.race([
       getTaskLog(row.id),
       new Promise((_, reject) => {
-        setTimeout(
-          () => reject(new Error("请求超时：后端接口5秒未响应")),
-          5000
-        );
+        setTimeout(() => reject(new Error("请求超时：5秒未响应")), 5000);
       }),
     ]);
-    // 打印后端返回的「完整响应数据」
-    console.log("后端接口响应成功，完整数据：", res);
-    const realLogs = res.data?.logs || [];
-    logDialog.logs =
-      realLogs.length > 0 ? realLogs : [`任务 ${row.taskName} 暂无执行日志`];
-    console.log("日志数据赋值完成：", logDialog.logs);
+    logDialog.logs = res.data?.logs?.length
+      ? res.data.logs
+      : [`任务 ${row.taskName} 暂无执行日志`];
   } catch (err) {
-    // 打印「完整错误信息」（包括超时、404、500、网络错误）
-    console.error("后端接口请求失败/超时，错误详情：", err);
-    ElMessage.warning(
-      `获取日志失败：${err.message || "未知错误"}，展示模拟日志`
-    );
+    ElMessage.warning(`获取日志失败：${err.message}，展示模拟日志`);
+    // 生成模拟日志
     const caseIds = row.caseId ? row.caseId.split(",") : [];
-    logDialog.logs = [`开始执行 ${row.taskName}`];
-    caseIds.forEach((cid) => {
-      const cname = caseMap[cid] ? caseMap[cid].name : `用例-${cid}`;
-      logDialog.logs.push(`执行用例 ${cname}：定位元素成功 → 操作成功`);
+    logDialog.logs = [
+      `[${new Date().toLocaleString()}] 开始执行任务：${row.taskName}`,
+    ];
+    caseIds.forEach((cid, index) => {
+      const cname = caseMap[cid]?.name || `用例-${cid}`;
+      logDialog.logs.push(
+        `[${new Date().toLocaleString()}] 执行用例 ${index + 1}/${
+          caseIds.length
+        }：${cname} → 操作成功`
+      );
     });
-    logDialog.logs.push(`任务执行结束`);
-    console.log("模拟日志赋值完成：", logDialog.logs);
+    logDialog.logs.push(
+      `[${new Date().toLocaleString()}] 任务 ${row.taskName} 执行结束`
+    );
   }
-
-  // 优化nextTick：把弹窗设置放在回调里，100%确保视图更新
   nextTick(() => {
     logDialog.visible = true;
-    console.log("弹窗状态已设置为true：", logDialog.visible);
-    console.log("===== 查看日志执行结束 =====");
   });
+}
+
+// 删除任务
+async function deleteTask(row) {
+  // 校验：执行中的任务不能删除
+  if (row.status === "running") {
+    ElMessage.warning("执行中的任务无法删除，请先终止任务！");
+    return;
+  }
+
+  // 确认弹窗
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除任务【${row.taskName}】吗？删除后不可恢复！`,
+      "删除确认",
+      {
+        confirmButtonText: "确认删除",
+        cancelButtonText: "取消",
+        type: "warning",
+        draggable: true,
+      }
+    );
+
+    // 调用删除接口
+    await apiDeleteTask(row.id);
+    ElMessage.success(`任务 ${row.taskName} 删除成功！`);
+
+    // 刷新列表
+    await loadTasks();
+  } catch (err) {
+    // 区分“用户取消”和“接口报错”
+    if (err !== "cancel") {
+      ElMessage.error(`删除任务失败：${err.message || "未知错误"}`);
+    }
+  }
 }
 
 // 分页切换
@@ -389,57 +515,170 @@ function onTaskPageChange({ pageNum, pageSize }) {
   taskPage.pageSize = pageSize;
   loadTasks();
 }
+
+// 初始化
+onMounted(async () => {
+  await initCases();
+  await loadTasks();
+});
+
+// 监听任务列表变化，更新分页总数
+watch(
+  () => tasks.value,
+  (newTasks) => {
+    taskPage.total = newTasks.length;
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped lang="less">
 .task-schedule-root {
   padding: 20px;
+  background-color: #f5f7fa;
+  min-height: 100vh;
 }
 
 .top-card,
 .list-card {
   background: #fff;
-  padding: 16px;
+  padding: 20px;
   border-radius: 8px;
   margin-bottom: 16px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.04);
+}
+
+.top-card h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #1f2937;
+  font-weight: 600;
 }
 
 .task-form .el-form-item {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .timed-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+  margin-top: 8px;
 }
 
+// Cron输入区域样式优化
+.cron-input-wrapper {
+  width: 100%;
+  :deep(.el-input) {
+    width: 100%;
+    :deep(.el-input-group__append) {
+      padding: 0;
+      border-left: none;
+      background-color: #f9fafb;
+      :deep(.el-select) {
+        width: 100%;
+      }
+    }
+  }
+}
+
+.cron-tip {
+  margin-top: 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  .tip-label {
+    color: #666;
+    white-space: nowrap;
+  }
+
+  .el-tag {
+    flex-shrink: 0;
+  }
+
+  .el-link {
+    margin-left: auto;
+    white-space: nowrap;
+  }
+}
+
+// 列表区域样式优化
+.list-actions {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.case-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.task-table {
+  --el-table-header-text-color: #666;
+  --el-table-row-hover-bg-color: #f9fafb;
+}
+
+// 日志弹窗样式优化
+.log-body {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 10px 0;
+  background-color: #f9fafb;
+  border-radius: 4px;
+  margin: 8px 0;
+
+  ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+
+  .log-item {
+    line-height: 1.8;
+    font-size: 14px;
+    color: #333;
+    padding: 2px 0;
+    border-bottom: 1px dashed #eee;
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+// 响应式适配
 @media (max-width: 768px) {
+  .task-schedule-root {
+    padding: 10px;
+  }
+
+  .top-card,
+  .list-card {
+    padding: 16px;
+  }
+
   .timed-row {
     flex-direction: column;
     align-items: stretch;
   }
-}
 
-.list-actions {
-  margin-bottom: 12px;
-}
+  .cron-tip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
 
-.case-names .el-tag {
-  margin-right: 6px;
-}
+    .el-link {
+      margin-left: 0;
+      margin-top: 4px;
+    }
+  }
 
-// 日志弹窗样式优化，加滚动条避免日志溢出
-.log-body {
-  max-height: 400px;
-  overflow-y: auto;
-  padding: 10px 0;
-  ul {
-    margin: 0;
-    padding-left: 20px;
-    li {
-      line-height: 1.8;
-      font-size: 14px;
+  // 移动端操作列适配
+  .task-table :deep(.el-table-column--operation) {
+    .el-button {
+      margin-left: 4px !important;
+      padding: 4px 8px;
+      font-size: 12px;
     }
   }
 }

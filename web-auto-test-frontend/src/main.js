@@ -26,6 +26,8 @@ app.use(ElementPlus);
 app.use(pinia);
 app.use(router);
 
+// 已删除全局注册el-cron的代码（改用@vue-js-cron/element-plus局部引入）
+
 // 挂载应用到 DOM
 app.mount("#app");
 

@@ -1,6 +1,8 @@
 package com.auto.test.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName; // 必须导入这个包
 import lombok.Data;
 import java.util.Date;
@@ -8,6 +10,7 @@ import java.util.Date;
 @Data
 @TableName("test_task") // 关键：指定实体类对应的数据库表名是test_task
 public class Task {
+    @TableId(type = IdType.AUTO)
     private Integer id; // 任务ID
     private String taskName; // 任务名称
     private String caseId; // 关联用例ID（逗号分隔）
