@@ -40,6 +40,7 @@
         style="width: 100%"
         row-key="id"
         :header-cell-style="headerStyle"
+        v-loading="loading"
       >
         <el-table-column prop="id" label="用户ID" width="100" />
         <el-table-column prop="username" label="用户名" />
@@ -145,8 +146,12 @@
 import { ref, reactive, computed, onMounted, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import CommonPagination from "@/components/CommonPagination.vue";
+// 导入用户管理接口
+import { getUserList, addUser, updateUser, deleteUser } from "@/api/user";
 
-// 页面数据
+// 加载状态
+const loading = ref(false);
+// 页面数据（替换模拟数据）
 const usersAll = ref([]);
 const filtered = ref([]);
 
@@ -181,27 +186,10 @@ const rules = {
   role: [{ required: true, message: "请选择角色", trigger: "change" }],
 };
 
-// 初始化模拟数据
-function genUsers(n = 10) {
-  const arr = [];
-  for (let i = 1; i <= n; i++) {
-    const role = i % 2 === 0 ? "admin" : "user";
-    const enabled = i <= 8 ? true : false;
-    const createTime =
-      Date.now() - Math.floor(Math.random() * 7 * 24 * 3600 * 1000);
-    arr.push({ id: i, username: `user${i}`, role, enabled, createTime });
-  }
-  return arr;
-}
-
-onMounted(() => {
-  usersAll.value = genUsers(10);
-  filtered.value = [...usersAll.value];
-  page.total = filtered.value.length;
-});
-
-function formatDate(ts) {
-  const d = new Date(ts);
+// 格式化日期（适配后端LocalDateTime）
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
   const Y = d.getFullYear();
   const M = String(d.getMonth() + 1).padStart(2, "0");
   const D = String(d.getDate()).padStart(2, "0");
@@ -211,6 +199,40 @@ function formatDate(ts) {
   return `${Y}-${M}-${D} ${h}:${m}:${s}`;
 }
 
+// 加载用户列表（真实接口）
+async function loadUserList() {
+  loading.value = true;
+  try {
+    const params = {
+      pageNum: page.pageNum,
+      pageSize: page.pageSize,
+    };
+    const res = await getUserList(params);
+    if (res.code === 200) {
+      // 适配后端返回格式：list + total
+      usersAll.value = res.data.list.map((item) => ({
+        ...item,
+        // 后端status是1/0，前端用enabled（true/false）
+        enabled: item.status === 1,
+      }));
+      page.total = res.data.total;
+      filtered.value = [...usersAll.value];
+    } else {
+      ElMessage.error("加载用户列表失败：" + res.msg);
+    }
+  } catch (err) {
+    ElMessage.error("加载用户列表失败：" + err.message);
+  } finally {
+    loading.value = false;
+  }
+}
+
+// 页面加载时调用
+onMounted(() => {
+  loadUserList();
+});
+
+// 搜索
 function handleSearch() {
   let res = [...usersAll.value];
   if (filters.username && filters.username.trim()) {
@@ -229,6 +251,7 @@ function handleSearch() {
   page.pageNum = 1;
 }
 
+// 重置搜索
 function handleReset() {
   filters.username = "";
   filters.role = "all";
@@ -238,18 +261,21 @@ function handleReset() {
   page.pageNum = 1;
 }
 
+// 分页数据
 const pagedUsers = computed(() => {
   const start = (page.pageNum - 1) * page.pageSize;
   return filtered.value.slice(start, start + page.pageSize);
 });
 
+// 分页切换
 function onPageChange({ pageNum, pageSize }) {
   page.pageNum = pageNum;
   page.pageSize = pageSize;
+  loadUserList(); // 分页切换重新加载数据
 }
 
+// 新增用户
 function openAdd() {
-  console.log("=== 点击了【新增用户】按钮 ===");
   dialog.mode = "add";
   dialog.form = {
     id: null,
@@ -258,15 +284,13 @@ function openAdd() {
     role: "user",
     enabled: true,
   };
-  // 确保在 DOM 更新后再展示弹窗，避免 ref 未初始化导致校验或聚焦问题
   nextTick(() => {
-    console.log("=== 执行nextTick，设置dialogVisible为true ===");
     dialogVisible.value = true;
   });
 }
 
+// 编辑用户
 function openEdit(row) {
-  console.log("=== 点击了【编辑用户】按钮 ===", row); // 新增日志
   dialog.mode = "edit";
   dialog.form = {
     id: row.id,
@@ -275,74 +299,72 @@ function openEdit(row) {
     role: row.role,
     enabled: row.enabled,
   };
-  // 等待 DOM 更新后再显示弹窗
   nextTick(() => {
     dialogVisible.value = true;
   });
 }
 
-function submitForm() {
-  const doSave = () => {
-    if (dialog.mode === "add") {
-      const newId = usersAll.value.length
-        ? Math.max(...usersAll.value.map((u) => u.id)) + 1
-        : 1;
-      usersAll.value.unshift({
-        id: newId,
-        username: dialog.form.username.trim(),
-        role: dialog.form.role,
-        enabled: !!dialog.form.enabled,
-        createTime: Date.now(),
-      });
-      ElMessage.success("新增用户成功");
-    } else {
-      const idx = usersAll.value.findIndex((u) => u.id === dialog.form.id);
-      if (idx !== -1) {
-        usersAll.value[idx].username = dialog.form.username.trim();
-        usersAll.value[idx].role = dialog.form.role;
-        usersAll.value[idx].enabled = !!dialog.form.enabled;
-      }
-      ElMessage.success("编辑用户成功");
-    }
-    dialogVisible.value = false;
-    // 重新应用筛选
-    handleSearch();
-  };
+// 提交表单（新增/编辑）
+async function submitForm() {
+  if (!userFormRef.value) return;
 
-  if (userFormRef.value && typeof userFormRef.value.validate === "function") {
-    userFormRef.value.validate((valid) => {
-      if (!valid) return;
-      doSave();
+  userFormRef.value.validate(async (valid) => {
+    if (!valid) return;
+
+    const formData = {
+      username: dialog.form.username.trim(),
+      password: dialog.form.password,
+      role: dialog.form.role,
+      status: dialog.form.enabled ? 1 : 0, // 转换为后端的1/0
+    };
+
+    try {
+      if (dialog.mode === "add") {
+        // 新增用户
+        const res = await addUser(formData);
+        if (res.code === 200) {
+          ElMessage.success("新增用户成功");
+          dialogVisible.value = false;
+          loadUserList(); // 重新加载列表
+        } else {
+          ElMessage.error("新增失败：" + res.msg);
+        }
+      } else {
+        // 编辑用户
+        const res = await updateUser(dialog.form.id, formData);
+        if (res.code === 200) {
+          ElMessage.success("编辑用户成功");
+          dialogVisible.value = false;
+          loadUserList(); // 重新加载列表
+        } else {
+          ElMessage.error("编辑失败：" + res.msg);
+        }
+      }
+    } catch (err) {
+      ElMessage.error("操作失败：" + err.message);
+    }
+  });
+}
+
+// 删除用户
+async function confirmDelete(row) {
+  try {
+    await ElMessageBox.confirm(`确认删除用户 ${row.username} 吗？`, "提示", {
+      type: "warning",
     });
-  } else {
-    // 回退校验，避免 ref 未初始化导致异常
-    if (!dialog.form.username || !dialog.form.username.trim()) {
-      ElMessage.error("用户名不能为空");
-      return;
+    const res = await deleteUser(row.id);
+    if (res.code === 200) {
+      ElMessage.success("删除用户成功");
+      loadUserList(); // 重新加载列表
+    } else {
+      ElMessage.error("删除失败：" + res.msg);
     }
-    if (
-      dialog.mode === "add" &&
-      (!dialog.form.password || dialog.form.password.length < 6)
-    ) {
-      ElMessage.error("密码长度不能少于6位");
-      return;
-    }
-    doSave();
+  } catch (err) {
+    // 取消删除不提示
   }
 }
 
-function confirmDelete(row) {
-  ElMessageBox.confirm(`确认删除用户 ${row.username} 吗？`, "提示", {
-    type: "warning",
-  })
-    .then(() => {
-      usersAll.value = usersAll.value.filter((u) => u.id !== row.id);
-      ElMessage.success("删除用户成功");
-      handleSearch();
-    })
-    .catch(() => {});
-}
-
+// 重置密码（模拟）
 function confirmReset(row) {
   ElMessageBox.confirm(
     `确认重置 ${row.username} 的密码为 123456 吗？`,
@@ -355,9 +377,27 @@ function confirmReset(row) {
     .catch(() => {});
 }
 
-function onToggleStatus(row) {
-  // row.enabled 已经被修改
-  ElMessage.success(`用户 ${row.username} 状态更新成功`);
+// ========== 核心修改：状态切换调用后端接口 ==========
+async function onToggleStatus(row) {
+  // 1. 转换状态：前端enabled(true/false) → 后端status(1/0)
+  const newStatus = row.enabled ? 1 : 0;
+  try {
+    // 2. 调用后端updateUser接口更新状态（仅传status字段即可）
+    const res = await updateUser(row.id, { status: newStatus });
+    if (res.code === 200) {
+      ElMessage.success(`用户 ${row.username} 状态更新成功`);
+      // 3. 重新加载列表，确保数据和数据库一致
+      loadUserList();
+    } else {
+      ElMessage.error(`状态更新失败：${res.msg}`);
+      // 4. 接口失败时，回滚开关状态（避免前端显示和数据库不一致）
+      row.enabled = !row.enabled;
+    }
+  } catch (err) {
+    ElMessage.error(`状态更新失败：${err.message}`);
+    // 5. 网络错误时，回滚开关状态
+    row.enabled = !row.enabled;
+  }
 }
 
 const headerStyle = { background: "#f9fafb", height: "48px" };

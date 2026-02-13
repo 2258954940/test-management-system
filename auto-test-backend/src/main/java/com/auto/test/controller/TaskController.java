@@ -5,6 +5,7 @@ import com.auto.test.common.ApiResponse;
 import com.auto.test.entity.Task;
 import com.auto.test.scheduler.TaskSchedulerManager;
 import com.auto.test.service.TaskService;
+import com.auto.test.service.SysLogService; // 新增：导入日志服务
 import org.slf4j.Logger; // 新增：导入日志接口
 import org.slf4j.LoggerFactory; // 新增：导入日志工厂
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,9 @@ public class TaskController {
     
     @Autowired
     private TaskSchedulerManager taskSchedulerManager;
+    
+    @Autowired
+    private SysLogService sysLogService; // 新增：注入日志服务
 
     /**
      * 分页获取任务列表（适配前端分页）
@@ -55,7 +59,7 @@ public class TaskController {
     }
 
     /**
-     * 创建任务（核心修改：返回任务ID，支持前端自动触发立即执行）
+     * 创建任务（核心修改：返回任务ID，支持前端自动触发立即执行 + 添加日志）
      */
     @PostMapping("/create")
     public ApiResponse<Map<String, Object>> createTask(@RequestBody Map<String, Object> data) {
@@ -95,6 +99,13 @@ public class TaskController {
             });
         }
 
+        // 新增：记录操作日志
+        sysLogService.saveLog(
+            "admin",
+            "新增调度任务",
+            "新增任务-" + task.getTaskName() + "（ID：" + task.getId() + "）"
+        );
+
         // 构建返回结果：包含提示信息 + 新任务ID（核心修改）
         Map<String, Object> result = new HashMap<>();
         result.put("message", "任务创建成功");
@@ -103,7 +114,7 @@ public class TaskController {
     }
 
     /**
-     * 运行任务（原有逻辑不变）
+     * 运行任务（原有逻辑不变 + 添加日志）
      */
     @PostMapping("/run/{id}")
     public ApiResponse<String> runTask(@PathVariable Integer id) {
@@ -119,16 +130,34 @@ public class TaskController {
             });
             task.setStatus("running");
             taskService.updateById(task);
+            
+            // 新增：记录操作日志
+            sysLogService.saveLog(
+                "admin",
+                "注册定时任务",
+                "注册任务-" + task.getTaskName() + "（ID：" + id + "），Cron：" + task.getCronExpression()
+            );
+            
             return ApiResponse.success("定时任务已注册，将按规则执行");
         }
 
         // 立即执行：调用原有逻辑
         boolean success = taskService.runTask(id);
+        
+        // 新增：记录操作日志
+        if (success) {
+            sysLogService.saveLog(
+                "admin",
+                "执行调度任务",
+                "执行任务-" + task.getTaskName() + "（ID：" + id + "）"
+            );
+        }
+        
         return success ? ApiResponse.success("任务开始执行") : ApiResponse.error("任务执行失败");
     }
 
     /**
-     * 停止任务（原有逻辑不变）
+     * 停止任务（原有逻辑不变 + 添加日志）
      */
     @PostMapping("/stop/{id}")
     public ApiResponse<String> stopTask(@PathVariable Integer id) {
@@ -143,6 +172,15 @@ public class TaskController {
             task.setId(id);
             task.setStatus("finished");
             taskService.updateById(task);
+            
+            // 新增：记录操作日志
+            Task oldTask = taskService.getById(id);
+            sysLogService.saveLog(
+                "admin",
+                "停止调度任务",
+                "停止任务-" + (oldTask != null ? oldTask.getTaskName() : "ID:" + id)
+            );
+            
             return ApiResponse.success("任务已终止");
         } else {
             return ApiResponse.error("任务终止失败");
@@ -161,13 +199,22 @@ public class TaskController {
     }
 
     /**
-     * 新增：删除任务接口（适配前端POST请求）
+     * 新增：删除任务接口（适配前端POST请求 + 添加日志）
      */
     @PostMapping("/delete/{id}")
     public ApiResponse<String> deleteTask(@PathVariable Integer id) {
         try {
+            // 先查询任务信息（用于日志）
+            Task oldTask = taskService.getById(id);
             boolean success = taskService.deleteTask(id);
             if (success) {
+                // 新增：记录操作日志
+                sysLogService.saveLog(
+                    "admin",
+                    "删除调度任务",
+                    "删除任务-" + (oldTask != null ? oldTask.getTaskName() : "ID:" + id)
+                );
+                
                 return ApiResponse.success("任务删除成功");
             } else {
                 return ApiResponse.error("任务不存在，删除失败");

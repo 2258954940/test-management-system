@@ -40,7 +40,6 @@ export function deleteUser(id) {
 /**
  * 重置用户密码
  * POST /api/system/user/resetPwd/{id}
- * @param {number|string} id 用户ID
  * @returns Promise<{ msg: string }>
  */
 export function resetUserPassword(id) {
@@ -66,18 +65,23 @@ export function saveSystemConfig(data) {
 }
 
 /**
- * 获取操作日志
+ * 获取操作日志（修正：统一函数名为getLogList，参数名匹配前端）
  * GET /api/system/log/list
- * @param {Object} params { pageNum, pageSize, username, opType, timeRange }
+ * @param {Object} params { username, operationType, start, end }
  */
-export function getOperationLog(params) {
+export function getLogList(params) {
   const payload = { ...params };
+  // 兼容前端传的timeRange，拆成后端需要的start/end（和LogManage.vue匹配）
   if (payload.timeRange && Array.isArray(payload.timeRange)) {
-    payload.startTime = payload.timeRange[0];
-    payload.endTime = payload.timeRange[1];
+    payload.start = payload.timeRange[0];
+    payload.end = payload.timeRange[1];
     delete payload.timeRange;
   }
-  return service.get("/api/system/log/list", { params: payload });
+  // 新增：添加admin角色头（后端需要鉴权）
+  return service.get("/api/system/log/list", {
+    params: payload,
+    headers: { "X-Role": localStorage.getItem("role") || "admin" },
+  });
 }
 
 export { getUserList as default };

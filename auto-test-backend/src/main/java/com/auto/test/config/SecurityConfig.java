@@ -31,18 +31,18 @@ public class SecurityConfig {
             .httpBasic(AbstractHttpConfigurer::disable)
             // 4. 无状态会话（JWT不需要session）
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // 5. 权限规则（核心修改：放行所有/user相关接口）
+            // 5. 权限规则（核心修改：去掉hasAuthority限制）
             .authorizeHttpRequests(auth -> auth
-                // 🔥 核心补充：放行登录/用户信息/退出接口（全方法）
+                // 放行登录/用户信息/退出接口（全方法）
                 .requestMatchers("/api/user/**").permitAll()
                 // 放行OPTIONS预检请求（跨域必加）
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // 开发环境临时放行用例/元素接口
                 .requestMatchers("/api/cases/**").permitAll()
                 .requestMatchers("/api/element/**").permitAll()
-                // 系统用户接口仅admin可访问（保留）
-                .requestMatchers("/api/system/user/**").hasAuthority("admin")
-                // 🔥 临时放行所有请求（毕设演示，避免其他接口拦截）
+                // 🔥 核心修改：放行/system/user/**（交给Controller自己校验X-Role）
+                .requestMatchers("/api/system/user/**").permitAll()
+                // 临时放行所有请求（毕设演示，避免其他接口拦截）
                 .anyRequest().permitAll() 
             );
 
@@ -57,7 +57,7 @@ public class SecurityConfig {
         config.setAllowCredentials(true);
         // 允许所有请求方法
         config.addAllowedMethod(CorsConfiguration.ALL);
-        // 允许所有请求头
+        // 允许所有请求头（包括X-Role）
         config.addAllowedHeader(CorsConfiguration.ALL);
         // 暴露Authorization头（前端可获取）
         config.addExposedHeader("Authorization");

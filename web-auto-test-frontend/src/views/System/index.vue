@@ -8,9 +8,9 @@
           <UserManage />
         </el-tab-pane>
 
-        <el-tab-pane label="系统配置" name="config">
+        <!-- <el-tab-pane label="系统配置" name="config">   系统配置暂时隐藏
           <ConfigManage />
-        </el-tab-pane>
+        </el-tab-pane> -->
 
         <el-tab-pane label="操作日志" name="log">
           <LogManage />
@@ -23,7 +23,7 @@
 <script setup>
 import { ref } from "vue";
 import UserManage from "@/views/System/UserManage.vue";
-import ConfigManage from "@/views/System/ConfigManage.vue";
+// import ConfigManage from "@/views/System/ConfigManage.vue";  系统配置暂时隐藏
 import LogManage from "@/views/System/LogManage.vue";
 
 const activeName = ref("user");

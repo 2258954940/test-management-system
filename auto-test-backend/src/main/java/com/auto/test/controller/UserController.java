@@ -3,6 +3,7 @@ package com.auto.test.controller;
 import com.auto.test.common.ApiResponse;
 import com.auto.test.entity.User;
 import com.auto.test.service.UserService;
+import com.auto.test.service.SysLogService; // 新增：导入日志服务
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.util.StringUtils;
@@ -19,9 +20,12 @@ import java.util.Map;
 public class UserController {
 
     private final UserService userService;
+    private final SysLogService sysLogService; // 新增：日志服务
 
-    public UserController(UserService userService) {
+    // 构造器注入（添加SysLogService）
+    public UserController(UserService userService, SysLogService sysLogService) { // 新增：日志服务参数
         this.userService = userService;
+        this.sysLogService = sysLogService; // 新增：赋值
     }
 
     /**
@@ -42,6 +46,12 @@ public class UserController {
             if (user == null) {
                 return ApiResponse.badRequest("用户名不存在");
             }
+            
+            // ========== 新增：用户状态校验 ==========
+            if (user.getStatus() == null || user.getStatus() != 1) {
+                return ApiResponse.badRequest("用户已被禁用，无法登录");
+            }
+            
             System.out.println("数据库里的明文密码：" + user.getPassword()); // 修正日志备注
             // 明文校验密码（已修改checkPassword逻辑）
             if (!userService.checkPassword(password, user.getPassword())) {
@@ -53,6 +63,14 @@ public class UserController {
             data.put("username", user.getUsername());
             data.put("role", user.getRole());
             System.out.println("后端返回的响应：code=200, data=" + data); // 修正日志打印
+            
+            // 新增：记录登录日志（可选）
+            sysLogService.saveLog(
+                username, // 用登录用户名作为操作人
+                "用户登录",
+                "用户" + username + "登录系统"
+            );
+            
             return ApiResponse.success("登录成功", data);
         } catch (Exception ex) {
             return ApiResponse.error("服务器错误: " + ex.getMessage(), null);
@@ -89,6 +107,14 @@ public class UserController {
     public ApiResponse<String> logout() {
         try {
             // 毕设演示：仅返回成功，生产环境需清理服务端token
+            
+            // 新增：记录退出日志（可选）
+            sysLogService.saveLog(
+                "admin",
+                "用户退出",
+                "用户admin退出系统"
+            );
+            
             return ApiResponse.success("退出成功", "ok");
         } catch (Exception ex) {
             return ApiResponse.error("退出失败: " + ex.getMessage(), null);
@@ -122,7 +148,7 @@ public class UserController {
     }
 
     /**
-     * 新增用户（仅 admin 允许）。
+     * 新增用户（仅 admin 允许）（添加日志）。
      */
     @PostMapping("/system/user/add")
     public ApiResponse<String> addUser(@RequestBody User payload,
@@ -147,6 +173,16 @@ public class UserController {
                 payload.setStatus(1);
             }
             boolean saved = userService.save(payload);
+            
+            // 新增：记录操作日志
+            if (saved) {
+                sysLogService.saveLog(
+                    "admin",
+                    "新增用户",
+                    "新增用户-" + payload.getUsername() + "（角色：" + payload.getRole() + "）"
+                );
+            }
+            
             return saved ? ApiResponse.success("新增成功", "ok") : ApiResponse.error("保存失败", null);
         } catch (Exception ex) {
             return ApiResponse.error("服务器错误: " + ex.getMessage(), null);
@@ -154,7 +190,7 @@ public class UserController {
     }
 
     /**
-     * 编辑用户（仅 admin 允许）。
+     * 编辑用户（仅 admin 允许）（添加日志）。
      */
     @PutMapping("/system/user/{id}")
     public ApiResponse<String> updateUser(@PathVariable Long id,
@@ -168,6 +204,12 @@ public class UserController {
             if (existing == null) {
                 return ApiResponse.badRequest("用户不存在");
             }
+            
+            // 记录修改前的状态（用于日志）
+            String oldUsername = existing.getUsername();
+            String oldRole = existing.getRole();
+            Integer oldStatus = existing.getStatus();
+            
             if (StringUtils.hasText(payload.getUsername())) {
                 existing.setUsername(payload.getUsername());
             }
@@ -182,6 +224,20 @@ public class UserController {
                 existing.setPassword(payload.getPassword());
             }
             boolean ok = userService.updateById(existing);
+            
+            // 新增：记录操作日志
+            if (ok) {
+                // 区分是编辑基本信息还是修改状态
+                String operationContent = "";
+                if (payload.getStatus() != null && !payload.getStatus().equals(oldStatus)) {
+                    operationContent = "修改用户" + oldUsername + "状态为：" + (payload.getStatus() == 1 ? "启用" : "禁用");
+                    sysLogService.saveLog("admin", "修改用户状态", operationContent);
+                } else {
+                    operationContent = "编辑用户-" + oldUsername + "（原角色：" + oldRole + "，新角色：" + existing.getRole() + "）";
+                    sysLogService.saveLog("admin", "编辑用户", operationContent);
+                }
+            }
+            
             return ok ? ApiResponse.success("更新成功", "ok") : ApiResponse.error("更新失败", null);
         } catch (Exception ex) {
             return ApiResponse.error("服务器错误: " + ex.getMessage(), null);
@@ -189,7 +245,7 @@ public class UserController {
     }
 
     /**
-     * 删除用户（仅 admin 允许）。
+     * 删除用户（仅 admin 允许）（添加日志）。
      */
     @DeleteMapping("/system/user/{id}")
     public ApiResponse<String> deleteUser(@PathVariable Long id,
@@ -198,7 +254,23 @@ public class UserController {
             if (!isAdmin(roleHeader)) {
                 return ApiResponse.forbidden("无权限");
             }
+            // 先查询用户信息（用于日志）
+            User user = userService.getById(id);
+            if (user == null) {
+                return ApiResponse.badRequest("用户不存在");
+            }
+            
             boolean ok = userService.removeById(id);
+            
+            // 新增：记录操作日志
+            if (ok) {
+                sysLogService.saveLog(
+                    "admin",
+                    "删除用户",
+                    "删除用户-" + user.getUsername() + "（ID：" + id + "）"
+                );
+            }
+            
             return ok ? ApiResponse.success("删除成功", "ok") : ApiResponse.error("删除失败", null);
         } catch (Exception ex) {
             return ApiResponse.error("服务器错误: " + ex.getMessage(), null);

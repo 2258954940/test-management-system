@@ -46,4 +46,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 毕设演示：返回明文
         return rawPassword;
     }
+     /**
+     * 用户状态更新（启用/禁用）
+     */
+        @Override
+    public boolean updateUserStatus(Long id, Integer status) {
+        User user = new User();
+        user.setId(id);
+        user.setStatus(status);
+        // 调用MyBatis-Plus的updateById更新状态
+        return this.updateById(user);
+    }
 }

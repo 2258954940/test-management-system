@@ -147,7 +147,6 @@
               :label="config.siteName"
               :value="config.siteCode"
             ></el-option>
-            <!-- 自闭合或闭合标签都可以，这里写完整闭合更规范 -->
           </el-select>
         </el-form-item>
         <!-- 断言配置字段 -->
@@ -168,12 +167,14 @@
             <el-option label="ID" value="id" />
             <el-option label="XPath" value="xpath" />
             <el-option label="Name" value="name" />
+            <el-option label="CSS选择器" value="css" />
+            <!-- 修改1：新增CSS定位类型 -->
           </el-select>
         </el-form-item>
         <el-form-item label="断言定位值" prop="assertLocatorValue">
           <el-input
             v-model="formModel.assertLocatorValue"
-            placeholder="请输入断言元素的定位值（如//a[contains(text(),'罗技G502')]）"
+            placeholder="请输入断言元素的定位值（百度搜索示例：//*[contains(text(),'自动化测试')]）"
           />
         </el-form-item>
         <el-form-item label="断言预期值" prop="assertExpectedValue">
@@ -379,7 +380,9 @@ const runCaseRules = reactive({
       },
     },
   ],
-  browserType: [],
+  browserType: [
+    { required: true, message: "请选择执行用例的浏览器", trigger: "change" }, // 修改5：补充浏览器校验
+  ],
 });
 
 // 验证详情
@@ -558,7 +561,7 @@ const formRules = {
   ],
   assertExpectedValue: [
     {
-      required: true,
+      required: false, // 修改3：改为非必填
       message: "文本断言需填写预期值",
       trigger: "blur",
       validator: (rule, value, callback) => {
@@ -702,12 +705,17 @@ async function handleRunCaseSubmit() {
 
     // 状态提示
     const execStatus = res.data?.status || "UNKNOWN";
-    if (execStatus === "PASS") {
-      ElMessage.success(`用例执行成功，状态：${execStatus}`);
+    // 修改4：优化执行结果提示
+    if (execStatus === "SUCCESS" || execStatus === "PASS") {
+      ElMessage.success(`用例执行成功 ✅，状态：${execStatus}`);
+    } else if (execStatus === "FAILED") {
+      ElMessage.error(
+        `用例执行失败 ❌，状态：${execStatus}（可查看后端日志或截图）`
+      );
     } else if (execStatus === "UNKNOWN") {
       ElMessage.warning(`用例执行完成（未验证结果），状态：${execStatus}`);
     } else {
-      ElMessage.error(`用例执行失败，状态：${execStatus}`);
+      ElMessage.info(`用例执行完成，状态：${execStatus}`);
     }
 
     runCaseDialogVisible.value = false;
@@ -795,7 +803,12 @@ function initTableResizeObserver() {
   resizeObserver = new ResizeObserver((entries) => {
     setTimeout(() => {
       const wrap = entries[0].target;
-      wrap.style.height = `${wrap.clientHeight}px`;
+      // 修改6：修复表格resize问题
+      if (wrap.clientHeight < 400) {
+        wrap.style.minHeight = "400px";
+      } else {
+        wrap.style.height = "auto";
+      }
     }, 100);
   });
   resizeObserver.observe(tableWrap.value);

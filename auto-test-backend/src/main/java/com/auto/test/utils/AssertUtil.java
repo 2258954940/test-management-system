@@ -1,50 +1,45 @@
-package com.auto.test.utils; // 必须和SeleniumUtil同包
+package com.auto.test.utils;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import java.time.Duration;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
-/**
- * 自动化测试通用断言工具类（适配任意网页的动态断言）
- */
 public class AssertUtil {
-    // 默认等待时间（10秒，和你的SeleniumUtil保持一致）
-    private static final int DEFAULT_WAIT_SECONDS = 10;
+    private static final int DEFAULT_WAIT_SECONDS = 20;
 
-    /**
-     * 动态断言核心方法：从用例配置读取规则，验证任意网页的元素/文本
-     * @param driver 浏览器驱动（复用你的SeleniumUtil创建的driver）
-     * @param assertType 断言类型：TEXT（文本匹配）/ELEMENT（元素存在）
-     * @param locatorType 定位类型：id/xpath/name（和你的Element实体一致）
-     * @param locatorValue 定位值（比如元素ID、XPath）
-     * @param expectedValue 预期值（文本断言时用，元素断言时传null即可）
-     */
-    public static void assertByConfig(WebDriver driver, 
-                                     String assertType, 
-                                     String locatorType, 
-                                     String locatorValue, 
+    public static void assertByConfig(WebDriver driver,
+                                     String assertType,
+                                     String locatorType,
+                                     String locatorValue,
                                      String expectedValue) {
-        // 1. 构建定位符（适配你的Element实体的定位类型）
         By elementLocator = buildByLocator(locatorType, locatorValue);
+        String expected = expectedValue == null ? "" : expectedValue.trim();
 
-        // 2. 根据断言类型执行验证
         switch (assertType.toUpperCase()) {
             case "ELEMENT":
-                // 断言：元素存在（比如购物车图标、登录按钮）
+            case "EXISTS":
                 waitForElementExist(driver, elementLocator);
                 break;
             case "TEXT":
-                // 断言：元素文本包含预期内容（修改点1：从严格相等→包含匹配）
-                String actualText = getElementText(driver, elementLocator);
-                // 核心修改：equals → contains
-                if (!actualText.trim().contains(expectedValue.trim())) {
-                    throw new RuntimeException(
-                        // 修改点2：异常提示说明“包含”
-                        String.format("文本断言失败！预期包含：%s，实际：%s", expectedValue, actualText)
-                    );
+                String actualText = "";
+                try {
+                    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(DEFAULT_WAIT_SECONDS));
+                    WebElement element = wait.until(ExpectedConditions.visibilityOfElementLocated(elementLocator));
+                    wait.until(ExpectedConditions.elementToBeClickable(elementLocator));
+                    actualText = element.getText().trim();
+                    if (!actualText.contains(expected)) {
+                        throw new RuntimeException(
+                                String.format("元素文本断言失败！预期包含：%s，实际：%s", expected, actualText)
+                        );
+                    }
+                } catch (TimeoutException e) {
+                    throw new RuntimeException("断言元素定位/可点击超时：" + locatorType + "=" + locatorValue, e);
                 }
                 break;
             default:
@@ -52,29 +47,52 @@ public class AssertUtil {
         }
     }
 
-    // 私有方法：构建定位符（抽离出来，方便复用）
+    public static void assertSearchSuccess(WebDriver driver,
+                                          String keyword,
+                                          String resultAreaLocatorType,
+                                          String resultAreaLocatorValue) {
+        String cleanKeyword = keyword.trim();
+        String encodedKeyword = URLEncoder.encode(cleanKeyword, StandardCharsets.UTF_8);
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(DEFAULT_WAIT_SECONDS));
+
+        String currentUrl = driver.getCurrentUrl();
+        if (!currentUrl.contains(cleanKeyword) && !currentUrl.contains(encodedKeyword)) {
+            throw new RuntimeException(
+                    String.format("URL未包含目标关键词！当前URL：%s，预期包含：%s（或编码版：%s）",
+                            currentUrl, cleanKeyword, encodedKeyword)
+            );
+        }
+        System.out.println("[通用搜索断言] 条件1通过：URL包含关键词");
+
+        By resultAreaLocator = buildByLocator(resultAreaLocatorType, resultAreaLocatorValue);
+        WebElement resultArea = wait.until(ExpectedConditions.visibilityOfElementLocated(resultAreaLocator));
+        String resultAreaText = resultArea.getText().trim();
+
+        if (resultAreaText.isEmpty() || !resultAreaText.contains(cleanKeyword)) {
+            String textPreview = resultAreaText.substring(0, Math.min(resultAreaText.length(), 200));
+            throw new RuntimeException(
+                    String.format("结果区域未包含关键词！预期：%s，结果区域文本片段：%s",
+                            cleanKeyword, textPreview)
+            );
+        }
+        System.out.println("[通用搜索断言] 条件2通过：结果区域包含关键词");
+    }
+
     private static By buildByLocator(String locatorType, String locatorValue) {
-        if (locatorType == null || locatorValue == null) {
+        if (locatorType == null || locatorValue == null || locatorValue.trim().isEmpty()) {
             throw new RuntimeException("定位类型/定位值不能为空！");
         }
         return switch (locatorType.toLowerCase()) {
-            case "id" -> By.id(locatorValue);
-            case "xpath" -> By.xpath(locatorValue);
-            case "name" -> By.name(locatorValue);
+            case "id" -> By.id(locatorValue.trim());
+            case "xpath" -> By.xpath(locatorValue.trim());
+            case "name" -> By.name(locatorValue.trim());
+            case "css" -> By.cssSelector(locatorValue.trim());
             default -> throw new RuntimeException("不支持的定位类型：" + locatorType);
         };
     }
 
-    // 私有方法：等待元素存在（封装WebDriverWait，避免重复写）
     private static void waitForElementExist(WebDriver driver, By locator) {
         new WebDriverWait(driver, Duration.ofSeconds(DEFAULT_WAIT_SECONDS))
-            .until(ExpectedConditions.presenceOfElementLocated(locator));
-    }
-
-    // 私有方法：获取元素文本（确保元素可见后再获取）
-    private static String getElementText(WebDriver driver, By locator) {
-        WebElement element = new WebDriverWait(driver, Duration.ofSeconds(DEFAULT_WAIT_SECONDS))
-            .until(ExpectedConditions.visibilityOfElementLocated(locator));
-        return element.getText();
+                .until(ExpectedConditions.presenceOfElementLocated(locator));
     }
 }

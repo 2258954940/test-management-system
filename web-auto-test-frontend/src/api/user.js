@@ -46,3 +46,70 @@ export const logout = () => {
     return res;
   });
 };
+
+// ========== 新增：用户管理相关接口 ==========
+/**
+ * 查询用户列表（分页）
+ * @param {Object} params - 分页/筛选参数
+ * @param {number} params.pageNum - 页码
+ * @param {number} params.pageSize - 页大小
+ */
+export const getUserList = (params) => {
+  // 携带X-Role请求头（admin权限）
+  return service.get("/api/system/user/list", {
+    params,
+    headers: {
+      "X-Role": localStorage.getItem("role") || "admin",
+    },
+  });
+};
+
+/**
+ * 新增用户
+ * @param {Object} data - 用户信息
+ */
+export const addUser = (data) => {
+  return service.post("/api/system/user/add", data, {
+    headers: {
+      "X-Role": localStorage.getItem("role") || "admin",
+    },
+  });
+};
+
+/**
+ * 编辑用户
+ * @param {number} id - 用户ID
+ * @param {Object} data - 用户信息
+ */
+export const updateUser = (id, data) => {
+  return service.put(`/api/system/user/${id}`, data, {
+    headers: {
+      "X-Role": localStorage.getItem("role") || "admin",
+    },
+  });
+};
+
+/**
+ * 删除用户
+ * @param {number} id - 用户ID
+ */
+export const deleteUser = (id) => {
+  return service.delete(`/api/system/user/${id}`, {
+    headers: {
+      "X-Role": localStorage.getItem("role") || "admin",
+    },
+  });
+};
+/**
+ * 修改用户状态（启用/禁用）
+ * @param {number} id 用户ID
+ * @param {number} status 新状态：1=启用，0=禁用
+ */
+export const updateUserStatus = (id, status) => {
+  return service.put(`/api/system/user/status/${id}`, null, {
+    params: { status },
+    headers: {
+      "X-Role": localStorage.getItem("role") || "admin",
+    },
+  });
+};

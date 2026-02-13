@@ -22,4 +22,11 @@ public interface UserService extends IService<User> {
      * 对密码进行加密。
      */
     String encodePassword(String rawPassword);
+
+       /**
+     * 修改用户状态（启用/禁用）
+     * @param id 用户ID
+     * @param status 新状态：1=启用，0=禁用
+     */
+    boolean updateUserStatus(Long id, Integer status);
 }
