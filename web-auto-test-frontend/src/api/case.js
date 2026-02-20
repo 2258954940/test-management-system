@@ -44,3 +44,15 @@ export function runCase(data) {
     data: data, // { caseId, username, password, browserType }
   });
 }
+// 6. 根据ID获取用例详情（修复：添加Token请求头）
+export function getCaseById(id) {
+  // 从localStorage获取Token（和登录逻辑一致）
+  const token = localStorage.getItem("token") || "";
+  return request({
+    url: `/api/cases/case/${id}`,
+    method: "get",
+    headers: {
+      Authorization: token, // 关键：添加Token请求头，避免后端校验失败
+    },
+  });
+}

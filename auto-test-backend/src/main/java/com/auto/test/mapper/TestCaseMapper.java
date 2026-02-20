@@ -14,40 +14,44 @@ import java.util.List;
  */
 public interface TestCaseMapper {
 
-    // 核心修改：INSERT 语句补充断言+登录相关字段
+    // 核心修改：INSERT 语句补充 测试账号密码 + 原有断言+登录相关字段
     @Insert("INSERT INTO test_case(" +
             "name, description, url, locator_type, locator_value, action_type, " +
             "input_data, expected_result, creator, element_ids, " +
             "assert_type, assert_locator_type, assert_locator_value, assert_expected_value, " +
-            "need_login, site_code, create_time, update_time" +
+            "need_login, site_code, test_account, test_password, " + // 新增：测试账号密码字段
+            "create_time, update_time" +
             ") VALUES(" +
             "#{name}, #{description}, #{url}, #{locatorType}, #{locatorValue}, #{actionType}, " +
             "#{inputData}, #{expectedResult}, #{creator}, #{elementIds}, " +
             "#{assertType}, #{assertLocatorType}, #{assertLocatorValue}, #{assertExpectedValue}, " +
-            "#{needLogin}, #{siteCode}, NOW(), NOW()" +
+            "#{needLogin}, #{siteCode}, #{testAccount}, #{testPassword}, " + // 新增：对应参数
+            "NOW(), NOW()" +
             ")")
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     int insertTestCase(TestCase testCase);
 
-    // 核心修改：SELECT 语句补充断言+登录相关字段
+    // 核心修改：SELECT 语句补充 测试账号密码 + 原有断言+登录相关字段
     @Select("SELECT " +
             "id, name, description, url, locator_type, locator_value, action_type, " +
             "input_data, expected_result, creator, element_ids, " +
             "assert_type, assert_locator_type, assert_locator_value, assert_expected_value, " +
-            "need_login, site_code, create_time, update_time " +
+            "need_login, site_code, test_account, test_password, " + // 新增：查询账号密码
+            "create_time, update_time " +
             "FROM test_case WHERE id = #{id}")
     TestCase findById(Long id);
 
-    // 核心修改：SELECT ALL 补充断言+登录相关字段
+    // 核心修改：SELECT ALL 补充 测试账号密码 + 原有断言+登录相关字段
     @Select("SELECT " +
             "id, name, description, url, locator_type, locator_value, action_type, " +
             "input_data, expected_result, creator, element_ids, " +
             "assert_type, assert_locator_type, assert_locator_value, assert_expected_value, " +
-            "need_login, site_code, create_time, update_time " +
+            "need_login, site_code, test_account, test_password, " + // 新增：查询账号密码
+            "create_time, update_time " +
             "FROM test_case ORDER BY create_time DESC")
     List<TestCase> findAll();
 
-    // 核心修改：UPDATE 语句补充断言+登录相关字段
+    // 核心修改：UPDATE 语句补充 测试账号密码 + 原有断言+登录相关字段
     @Update("UPDATE test_case SET " +
             "name=#{name}, description=#{description}, url=#{url}, " +
             "locator_type=#{locatorType}, locator_value=#{locatorValue}, action_type=#{actionType}, " +
@@ -56,6 +60,7 @@ public interface TestCaseMapper {
             "assert_type=#{assertType}, assert_locator_type=#{assertLocatorType}, " +
             "assert_locator_value=#{assertLocatorValue}, assert_expected_value=#{assertExpectedValue}, " +
             "need_login=#{needLogin}, site_code=#{siteCode}, " +
+            "test_account=#{testAccount}, test_password=#{testPassword}, " + // 新增：更新账号密码
             "update_time=NOW() " +
             "WHERE id=#{id}")
     int updateTestCase(TestCase testCase);

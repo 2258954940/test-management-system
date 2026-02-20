@@ -62,6 +62,10 @@ public class TestCaseService {
         testCase.setCreator(request.getCreator());
         testCase.setNeedLogin(request.getNeedLogin() != null ? request.getNeedLogin() : false);
         testCase.setSiteCode(request.getSiteCode());
+        // ========== 新增：保存测试账号密码 ==========
+        testCase.setTestAccount(request.getTestAccount() != null ? request.getTestAccount() : "");
+        testCase.setTestPassword(request.getTestPassword() != null ? request.getTestPassword() : "");
+        // ========== 原有：断言字段 ==========
         testCase.setAssertType(request.getAssertType() != null ? request.getAssertType() : "TEXT");
         testCase.setAssertLocatorType(request.getAssertLocatorType() != null ? request.getAssertLocatorType() : "id");
         testCase.setAssertLocatorValue(request.getAssertLocatorValue() != null ? request.getAssertLocatorValue() : "");
@@ -576,6 +580,10 @@ public class TestCaseService {
         originalCase.setElementIds(request.getElementIds() != null ? request.getElementIds() : originalCase.getElementIds());
         originalCase.setNeedLogin(request.getNeedLogin() != null ? request.getNeedLogin() : originalCase.getNeedLogin());
         originalCase.setSiteCode(request.getSiteCode() != null ? request.getSiteCode() : originalCase.getSiteCode());
+        // ========== 新增：更新测试账号密码 ==========
+        originalCase.setTestAccount(request.getTestAccount() != null ? request.getTestAccount() : originalCase.getTestAccount());
+        originalCase.setTestPassword(request.getTestPassword() != null ? request.getTestPassword() : originalCase.getTestPassword());
+        // ========== 原有：断言字段 ==========
         originalCase.setAssertType(request.getAssertType() != null ? request.getAssertType() : originalCase.getAssertType());
         originalCase.setAssertLocatorType(request.getAssertLocatorType() != null ? request.getAssertLocatorType() : originalCase.getAssertLocatorType());
         originalCase.setAssertLocatorValue(request.getAssertLocatorValue() != null ? request.getAssertLocatorValue() : originalCase.getAssertLocatorValue());

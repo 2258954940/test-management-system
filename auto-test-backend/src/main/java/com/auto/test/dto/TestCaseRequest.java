@@ -26,7 +26,10 @@ public class TestCaseRequest {
     private String actionType;
     private Boolean needLogin; // 是否需要登录
     private String siteCode;   // 关联的网站编码
-    // ========== 新增：断言字段（和前端提交的key完全对应） ==========
+    // ========== 新增：测试账号密码字段（毕设场景） ==========
+    private String testAccount;  // 测试账号
+    private String testPassword; // 测试密码
+    // ========== 原有：断言字段（和前端提交的key完全对应） ==========
     @NotBlank(message = "断言类型不能为空")
     private String assertType;
     @NotBlank(message = "断言定位类型不能为空")

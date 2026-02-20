@@ -32,41 +32,48 @@ public class TestCaseController {
     private final TestCaseService testCaseService;
     private final SiteTestConfigService siteTestConfigService;
     private final SysLogService sysLogService;
-    private final UserService userService; // 新增：注入UserService用于解析Token
+    private final UserService userService;
 
-    // 构造器注入（添加UserService）
     public TestCaseController(TestCaseService testCaseService,
                               SiteTestConfigService siteTestConfigService,
                               SysLogService sysLogService,
-                              UserService userService) { // 新增UserService
+                              UserService userService) {
         this.testCaseService = testCaseService;
         this.siteTestConfigService = siteTestConfigService;
         this.sysLogService = sysLogService;
-        this.userService = userService; // 赋值
+        this.userService = userService;
+    }
+
+    // ========== 新增：根据ID查询单个用例详情（核心修复） ==========
+    @GetMapping("/case/{id}")
+    public ApiResponse<TestCase> getCaseById(@PathVariable Long id) {
+        try {
+            TestCase testCase = testCaseService.findById(id);
+            if (testCase == null) {
+                return ApiResponse.error("用例不存在", null);
+            }
+            // 确保返回的用例包含testAccount/testPassword字段
+            return ApiResponse.success("查询成功", testCase);
+        } catch (Exception ex) {
+            return ApiResponse.error("查询用例详情失败: " + ex.getMessage(), null);
+        }
     }
 
     /**
-     * 新增测试用例（修复：获取真实登录用户）
+     * 新增测试用例
      */
     @PostMapping("/addCase")
     public ApiResponse<TestCase> addCase(@Valid @RequestBody TestCaseRequest request,
-                                         @RequestHeader("Authorization") String token) { // 新增Token参数
+                                         @RequestHeader("Authorization") String token) {
         try {
-            // 核心：从Token解析真实用户名并设置到SecurityContext
             String currentUser = getRealUsernameFromTokenAndSetContext(token);
-            
             TestCase saved = testCaseService.addTestCase(request);
-            
-            // 获取用例名称（根据实际字段调整）
             String caseName = saved.getName() != null ? saved.getName() : "未命名用例-" + saved.getId();
-            
-            // 记录操作日志（使用真实用户名）
             sysLogService.saveLog(
                     currentUser,
                     "新增测试用例",
                     "新增用例-" + caseName + "（ID：" + saved.getId() + "）"
             );
-            
             return ApiResponse.success("新增用例成功", saved);
         } catch (Exception ex) {
             return ApiResponse.error("新增用例失败: " + ex.getMessage(), null);
@@ -74,33 +81,43 @@ public class TestCaseController {
     }
 
     /**
-     * 扩展版：执行用例（支持纯UI/登录+API两种模式 + 修复：获取真实登录用户）
+     * 执行用例
      */
     @PostMapping({"/runCase", "/run/{caseId}"})
     public ApiResponse<TestResult> runCase(@PathVariable(name = "caseId", required = false) Long pathCaseId,
                                            @Valid @RequestBody RunCaseRequest request,
                                            @RequestParam(name = "browserType", required = false, defaultValue = "edge") String browserType,
-                                           @RequestHeader("Authorization") String token) { // 新增Token参数
+                                           @RequestHeader("Authorization") String token) {
         try {
-            // 核心：从Token解析真实用户名并设置到SecurityContext
             String currentUser = getRealUsernameFromTokenAndSetContext(token);
-            
             Long targetCaseId = request.getCaseId() != null ? request.getCaseId() : pathCaseId;
             if (targetCaseId == null) {
                 return ApiResponse.error("用例ID不能为空", null);
             }
-            // 1. 先查询用例，获取登录相关配置
             TestCase testCase = testCaseService.findById(targetCaseId);
             if (testCase == null) {
                 return ApiResponse.error("用例不存在", null);
             }
 
-            // 2. 校验：需要登录时，账号密码不能为空
+            String finalUsername = null;
+            String finalPassword = null;
             if (testCase.getNeedLogin()) {
-                if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
+                if (StringUtils.hasText(testCase.getTestAccount())) {
+                    finalUsername = testCase.getTestAccount();
+                }
+                if (StringUtils.hasText(testCase.getTestPassword())) {
+                    finalPassword = testCase.getTestPassword();
+                }
+                if (StringUtils.hasText(request.getUsername())) {
+                    finalUsername = request.getUsername();
+                }
+                if (StringUtils.hasText(request.getPassword())) {
+                    finalPassword = request.getPassword();
+                }
+                if (!StringUtils.hasText(finalUsername)) {
                     return ApiResponse.error("需要登录时，测试账号不能为空", null);
                 }
-                if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+                if (!StringUtils.hasText(finalPassword)) {
                     return ApiResponse.error("需要登录时，测试密码不能为空", null);
                 }
                 if (testCase.getSiteCode() == null || testCase.getSiteCode().trim().isEmpty()) {
@@ -108,7 +125,6 @@ public class TestCaseController {
                 }
             }
 
-            // 3. 查询网站配置（需要登录时）
             SiteTestConfigDO siteConfig = null;
             if (testCase.getNeedLogin()) {
                 siteConfig = siteTestConfigService.getBySiteCode(testCase.getSiteCode());
@@ -117,22 +133,18 @@ public class TestCaseController {
                 }
             }
 
-            // 4. 执行用例（预期昵称复用用例的断言预期值）
             TestResult result = testCaseService.runTestCase(
                     request.getCaseId(),
                     siteConfig,
                     testCase.getNeedLogin(),
-                    request.getUsername(),
-                    request.getPassword(),
+                    finalUsername,
+                    finalPassword,
                     testCase.getAssertExpectedValue(),
                     browserType,
-                    null // 单次执行无任务关联
+                    null
             );
 
-            // 获取用例名称（根据实际字段调整）
             String caseName = testCase.getName() != null ? testCase.getName() : "未命名用例-" + testCase.getId();
-            
-            // 记录操作日志（使用真实用户名）
             sysLogService.saveLog(
                     currentUser,
                     "执行测试用例",
@@ -148,12 +160,13 @@ public class TestCaseController {
     }
 
     /**
-     * 查询所有测试用例（无需记录日志）
+     * 查询所有测试用例（修复：确保返回testAccount/testPassword字段）
      */
     @GetMapping("")
     public ApiResponse<List<TestCase>> listCases() {
         try {
             List<TestCase> caseList = testCaseService.listAll();
+            // 列表查询也返回完整字段（包含账号密码）
             return ApiResponse.success("查询用例列表成功", caseList);
         } catch (Exception ex) {
             return ApiResponse.error("查询用例列表失败: " + ex.getMessage(), null);
@@ -161,34 +174,25 @@ public class TestCaseController {
     }
 
     /**
-     * 更新指定测试用例（修复：获取真实登录用户）
+     * 更新指定测试用例
      */
     @PutMapping("/case/{id}")
     public ApiResponse<String> updateCase(@PathVariable Long id,
                                           @RequestBody TestCase request,
-                                          @RequestHeader("Authorization") String token) { // 新增Token参数
+                                          @RequestHeader("Authorization") String token) {
         try {
-            // 核心：从Token解析真实用户名并设置到SecurityContext
             String currentUser = getRealUsernameFromTokenAndSetContext(token);
-            
-            // 先查询原用例信息（用于日志）
             TestCase oldCase = testCaseService.findById(id);
             if (oldCase == null) {
                 return ApiResponse.error("用例不存在", null);
             }
-            
             testCaseService.updateTestCase(id, request);
-            
-            // 获取原用例名称（根据实际字段调整）
             String oldCaseName = oldCase.getName() != null ? oldCase.getName() : "未命名用例-" + oldCase.getId();
-            
-            // 记录操作日志（使用真实用户名）
             sysLogService.saveLog(
                     currentUser,
                     "编辑测试用例",
                     "编辑用例-" + oldCaseName + "（ID：" + id + "）"
             );
-            
             return ApiResponse.success("更新用例成功", "ok");
         } catch (IllegalArgumentException ex) {
             return ApiResponse.error("更新失败: " + ex.getMessage(), null);
@@ -198,33 +202,24 @@ public class TestCaseController {
     }
 
     /**
-     * 删除指定测试用例（修复：获取真实登录用户）
+     * 删除指定测试用例
      */
     @DeleteMapping("/case/{id}")
     public ApiResponse<String> deleteCase(@PathVariable Long id,
-                                          @RequestHeader("Authorization") String token) { // 新增Token参数
+                                          @RequestHeader("Authorization") String token) {
         try {
-            // 核心：从Token解析真实用户名并设置到SecurityContext
             String currentUser = getRealUsernameFromTokenAndSetContext(token);
-            
-            // 先查询原用例信息（用于日志）
             TestCase oldCase = testCaseService.findById(id);
             if (oldCase == null) {
                 return ApiResponse.error("用例不存在", null);
             }
-            
             testCaseService.deleteTestCase(id);
-            
-            // 获取原用例名称（根据实际字段调整）
             String oldCaseName = oldCase.getName() != null ? oldCase.getName() : "未命名用例-" + oldCase.getId();
-            
-            // 记录操作日志（使用真实用户名）
             sysLogService.saveLog(
                     currentUser,
                     "删除测试用例",
                     "删除用例-" + oldCaseName + "（ID：" + id + "）"
             );
-            
             return ApiResponse.success("删除用例成功", "ok");
         } catch (IllegalArgumentException ex) {
             return ApiResponse.error("删除失败: " + ex.getMessage(), null);
@@ -234,7 +229,7 @@ public class TestCaseController {
     }
 
     /**
-     * 查询所有网站配置（供前端下拉选择）（无需记录日志）
+     * 查询所有网站配置
      */
     @GetMapping("/siteConfigs")
     public ApiResponse<List<SiteTestConfigDO>> listSiteConfigs() {
@@ -246,40 +241,33 @@ public class TestCaseController {
         }
     }
 
-    // ===================== 核心工具方法 =====================
     /**
      * 从Token解析真实用户名并设置到SecurityContext
      */
     private String getRealUsernameFromTokenAndSetContext(String token) {
         try {
-            // 1. 解码URL编码的Token
             token = java.net.URLDecoder.decode(token, "UTF-8");
         } catch (Exception e) {
             throw new RuntimeException("Token解码失败，请重新登录");
         }
 
-        // 2. 校验Token格式
         if (!StringUtils.hasText(token) || !token.startsWith("auto-test-token-")) {
             throw new RuntimeException("Token无效，请重新登录");
         }
 
-        // 3. 拆分Token（格式：auto-test-token-张三-1771481838993）
         String[] tokenParts = token.split("-");
         if (tokenParts.length < 5) {
             throw new RuntimeException("Token格式错误，请重新登录");
         }
 
-        // 4. 提取用户名（索引3）
         String realUsername = tokenParts[3];
-        System.out.println("TestCaseController解析出的用户名：" + realUsername); // 调试用
+        System.out.println("TestCaseController解析出的用户名：" + realUsername);
 
-        // 5. 校验用户是否存在
         User user = userService.getByUsername(realUsername);
         if (user == null) {
             throw new RuntimeException("操作人不存在，请重新登录：" + realUsername);
         }
 
-        // 6. 设置到SecurityContext
         Authentication authentication = new UsernamePasswordAuthenticationToken(
                 realUsername,
                 null,
