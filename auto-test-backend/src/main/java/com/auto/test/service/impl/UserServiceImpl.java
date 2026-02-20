@@ -22,6 +22,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     @Override
     public User getByUsername(String username) {
+        if (username != null && username.trim().length() < 2) {
+            throw new IllegalArgumentException("用户名长度不能小于2");
+        }
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getUsername, username);
         return this.baseMapper.selectOne(wrapper);
@@ -56,5 +59,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setStatus(status);
         // 调用MyBatis-Plus的updateById更新状态
         return this.updateById(user);
+    }
+
+    @Override
+    public boolean save(User entity) {
+        if (entity != null && entity.getUsername() != null
+                && entity.getUsername().trim().length() < 2) {
+            throw new IllegalArgumentException("用户名长度不能小于2");
+        }
+        return super.save(entity);
+    }
+
+    @Override
+    public boolean updateById(User entity) {
+        if (entity != null && entity.getUsername() != null
+                && entity.getUsername().trim().length() < 2) {
+            throw new IllegalArgumentException("用户名长度不能小于2");
+        }
+        return super.updateById(entity);
     }
 }

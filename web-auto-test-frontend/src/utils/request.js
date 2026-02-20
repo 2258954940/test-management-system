@@ -27,7 +27,7 @@ service.interceptors.request.use(
       const role = localStorage.getItem("role") || "";
 
       // 修复请求头：简单赋值，避免AxiosHeaders不可变问题
-      if (token) config.headers["Authorization"] = token;
+      if (token) config.headers["Authorization"] = encodeURIComponent(token);
       if (role) config.headers["X-Role"] = role;
     }
 

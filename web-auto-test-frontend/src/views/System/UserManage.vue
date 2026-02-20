@@ -166,7 +166,10 @@ const dialog = reactive({
 const dialogVisible = ref(false);
 const userFormRef = ref(null);
 const rules = {
-  username: [{ required: true, message: "用户名不能为空", trigger: "blur" }],
+  username: [
+    { required: true, message: "用户名不能为空", trigger: "blur" },
+    { min: 2, message: "用户名长度不能小于2", trigger: "blur" },
+  ],
   password: [
     {
       validator: (rule, value, callback) => {

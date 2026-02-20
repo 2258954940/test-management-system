@@ -3,7 +3,8 @@ package com.auto.test.controller;
 import com.auto.test.dto.ElementParseRequest;
 import com.auto.test.entity.Element;
 import com.auto.test.service.ElementService;
-import com.auto.test.service.SysLogService; // 新增：导入日志服务
+import com.auto.test.service.SysLogService;
+import com.auto.test.utils.SecurityUtils; // 新增：导入工具类
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +21,7 @@ public class ElementController {
     @Autowired
     private ElementService elementService;
     @Autowired
-    private SysLogService sysLogService; // 新增：注入日志服务
+    private SysLogService sysLogService;
     private static final Logger log = LoggerFactory.getLogger(ElementController.class);
 
     // DOM解析接口（无需记录日志）
@@ -37,7 +38,7 @@ public class ElementController {
         }
     }
 
-    // 新增元素（添加日志）
+    // 新增元素（修改：使用当前用户）
     @PostMapping
     public Map<String, Object> addElement(@RequestBody Element element) {
         log.info("=== 接收新增元素请求，参数：{} ===", element);
@@ -45,9 +46,12 @@ public class ElementController {
             Element newElement = elementService.addElement(element);
             log.info("新增元素成功，ID：{}", newElement.getId());
             
-            // 新增：记录操作日志
+            // 关键修改：获取当前登录用户
+            String currentUser = SecurityUtils.getCurrentUsername();
+            
+            // 记录操作日志（替换admin为currentUser）
             sysLogService.saveLog(
-                "admin", // 毕设简化：固定为admin
+                currentUser, // 原："admin"
                 "新增定位元素",
                 "新增元素-" + newElement.getElementName() + "（ID：" + newElement.getId() + "）"
             );
@@ -59,7 +63,7 @@ public class ElementController {
         }
     }
 
-    // 编辑元素（添加日志）
+    // 编辑元素（修改：使用当前用户）
     @PutMapping("/{id}")
     public Map<String, Object> updateElement(@PathVariable Long id, @RequestBody Element element) {
         log.info("=== 接收编辑元素请求，ID：{}，参数：{} ===", id, element);
@@ -69,9 +73,12 @@ public class ElementController {
             elementService.updateElement(id, element);
             log.info("编辑元素成功，ID：{}", id);
             
-            // 新增：记录操作日志
+            // 关键修改：获取当前登录用户
+            String currentUser = SecurityUtils.getCurrentUsername();
+            
+            // 记录操作日志
             sysLogService.saveLog(
-                "admin",
+                currentUser, // 原："admin"
                 "编辑定位元素",
                 "编辑元素-" + (oldElement != null ? oldElement.getElementName() : "ID:" + id)
             );
@@ -105,7 +112,7 @@ public class ElementController {
         }
     }
 
-    // 删除元素（添加日志）
+    // 删除元素（修改：使用当前用户）
     @DeleteMapping("/{id}")
     public Map<String, Object> deleteElement(@PathVariable Long id) {
         try {
@@ -113,9 +120,12 @@ public class ElementController {
             Element oldElement = elementService.getElementById(id);
             elementService.deleteElement(id);
             
-            // 新增：记录操作日志
+            // 关键修改：获取当前登录用户
+            String currentUser = SecurityUtils.getCurrentUsername();
+            
+            // 记录操作日志
             sysLogService.saveLog(
-                "admin",
+                currentUser, // 原："admin"
                 "删除定位元素",
                 "删除元素-" + (oldElement != null ? oldElement.getElementName() : "ID:" + id)
             );
@@ -126,7 +136,7 @@ public class ElementController {
         }
     }
 
-    // 批量导入元素接口（添加日志）
+    // 批量导入元素接口（修改：使用当前用户）
     @PostMapping("/batchImport")
     public Map<String, Object> batchImportElements(@RequestBody Map<String, Object> request) {
         log.info("接收批量导入请求，原始参数：{}", request);
@@ -164,7 +174,7 @@ public class ElementController {
                 element.setLocatorValue((String) item.get("locatorValue") != null ? (String) item.get("locatorValue") : "//default");
                 element.setPageUrl(url);
                 element.setWidgetType((String) item.get("widgetType") != null ? (String) item.get("widgetType") : "unknown");
-                element.setCreateBy("admin");
+                element.setCreateBy(SecurityUtils.getCurrentUsername()); // 这里也改成当前用户
 
                 elements.add(element);
                 log.info("转换后的元素：{}", element);
@@ -172,9 +182,12 @@ public class ElementController {
 
             elementService.batchImportElements(elements);
             
-            // 新增：记录操作日志
+            // 关键修改：获取当前登录用户
+            String currentUser = SecurityUtils.getCurrentUsername();
+            
+            // 记录操作日志
             sysLogService.saveLog(
-                "admin",
+                currentUser, // 原："admin"
                 "批量导入定位元素",
                 "批量导入" + elements.size() + "个元素（URL：" + url + "）"
             );

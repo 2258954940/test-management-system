@@ -1,33 +1,79 @@
-# 前端忽略（对应你的web-auto-test-frontend文件夹）
+# ===================== 项目根目录 .gitignore 全局配置 =====================
+# 说明：此文件对整个test-management-system项目生效，子模块的.gitignore仅作为补充
+
+# -------------------- 前端模块忽略 (web-auto-test-frontend) --------------------
+# 依赖包
 web-auto-test-frontend/node_modules/
+# 构建产物
 web-auto-test-frontend/dist/
+# 环境变量文件
 web-auto-test-frontend/.env
 web-auto-test-frontend/.env.*
-web-auto-test-frontend/.vscode/
-# 补充：前端调试日志/编辑器临时文件
+web-auto-test-frontend/.env.local
+web-auto-test-frontend/.env.*.local
+# 日志文件
 web-auto-test-frontend/npm-debug.log*
 web-auto-test-frontend/yarn-debug.log*
 web-auto-test-frontend/yarn-error.log*
+web-auto-test-frontend/pnpm-debug.log*
+# 编辑器临时文件
+web-auto-test-frontend/.vscode/
 web-auto-test-frontend/*.swp
 web-auto-test-frontend/*.swo
+web-auto-test-frontend/*.suo
+web-auto-test-frontend/*.ntvs*
+web-auto-test-frontend/*.njsproj
+web-auto-test-frontend/*.sln
+# 系统文件
+web-auto-test-frontend/.DS_Store
 
-# 后端忽略（对应你的auto-test-backend文件夹）
+# -------------------- 后端模块忽略 (auto-test-backend) --------------------
+# Maven构建产物
 auto-test-backend/target/
-auto-test-backend/.idea/
-auto-test-backend/.env
-# 补充：后端Maven缓存/构建产物/截图日志
-auto-test-backend/.m2/
 auto-test-backend/*.jar
 auto-test-backend/*.war
-auto-test-backend/screenshots/  # 后端生成的截图，无需提交
-auto-test-backend/logs/         # 后端日志，无需提交
-auto-test-backend/*.iml         # IDEA的模块文件
+# Maven缓存
+auto-test-backend/.m2/
+# 截图目录（核心：解决你提交截图的问题）
+auto-test-backend/screenshots/
+# 日志目录
+auto-test-backend/logs/
+# 环境变量
+auto-test-backend/.env
+# IDEA相关文件
+auto-test-backend/.idea/
+auto-test-backend/*.iws
+auto-test-backend/*.iml
+auto-test-backend/*.ipr
+# STS相关文件
+auto-test-backend/.apt_generated
+auto-test-backend/.classpath
+auto-test-backend/.factorypath
+auto-test-backend/.project
+auto-test-backend/.settings
+auto-test-backend/.springBeans
+auto-test-backend/.sts4-cache
+# NetBeans相关文件
+auto-test-backend/nbproject/private/
+auto-test-backend/nbbuild/
+auto-test-backend/dist/
+auto-test-backend/nbdist/
+auto-test-backend/.nb-gradle/
+auto-test-backend/build/
+# 排除src下的target/build（避免误忽略源码内的合法目录）
+!auto-test-backend/**/src/main/**/target/
+!auto-test-backend/**/src/test/**/target/
+!auto-test-backend/**/src/main/**/build/
+!auto-test-backend/**/src/test/**/build/
 
-# 通用忽略文件
+# -------------------- 全局通用忽略 (整个项目生效) --------------------
+# 日志文件
 *.log
+# 系统文件
 .DS_Store
-# 补充：通用编辑器/系统临时文件
-.vscode/
-.idea/
+# 临时目录
 tmp/
 temp/
+# 通用编辑器目录
+.vscode/
+.idea/

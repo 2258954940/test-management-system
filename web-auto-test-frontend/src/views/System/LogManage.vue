@@ -51,30 +51,35 @@
             formatDate(row.createTime)
           }}</template>
         </el-table-column>
-        <!-- 已删除IP地址列 -->
       </el-table>
+      <div class="pagination-wrap">
+        <common-pagination
+          :total="page.total"
+          :pageNum="page.pageNum"
+          :pageSize="page.pageSize"
+          @onPageChange="onPageChange"
+        />
+      </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from "vue";
+import CommonPagination from "@/components/CommonPagination.vue";
 import { ElMessage } from "element-plus";
-// 导入真实日志接口（之前定义的）
 import { getLogList } from "@/api/system";
 
-// 加载状态
 const loading = ref(false);
-// 真实日志列表（从后端接口获取）
 const logList = ref([]);
-// 查询条件
+const page = reactive({ pageNum: 1, pageSize: 10, total: 0 });
 const filters = reactive({
   username: "",
   operationType: "",
-  timeRange: [], // 时间范围：[start, end]
+  timeRange: [],
 });
 
-// 格式化日期（适配后端LocalDateTime）
+// 日期格式化
 function formatDate(dateStr) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -87,15 +92,26 @@ function formatDate(dateStr) {
   return `${Y}-${M}-${D} ${h}:${m}:${s}`;
 }
 
-// 查询真实日志（调用后端接口）
-// LogManage.vue中handleSearch函数修正
+// 查询日志列表（核心：传递分页参数）
 async function handleSearch() {
   loading.value = true;
   try {
-    // 直接传filters，让system.js内部处理timeRange
-    const res = await getLogList(filters);
+    const params = {
+      username: filters.username,
+      operationType: filters.operationType,
+      start: filters.timeRange?.[0] || "",
+      end: filters.timeRange?.[1] || "",
+      pageNum: page.pageNum,
+      pageSize: page.pageSize, // 必须传pageSize
+    };
+    console.log("请求参数：", params); // 调试用，看是否正确
+    const res = await getLogList(params);
     if (res.code === 200) {
-      logList.value = res.data; // 后端返回的真实日志数据
+      logList.value = res.data.list || [];
+      page.total = res.data.total || 0;
+      page.pageNum = res.data.pageNum || page.pageNum;
+      page.pageSize = res.data.pageSize || page.pageSize;
+      console.log("后端返回：", res.data); // 调试用，看total是否正确
     } else {
       ElMessage.error("查询日志失败：" + res.msg);
     }
@@ -111,10 +127,18 @@ function handleReset() {
   filters.username = "";
   filters.operationType = "";
   filters.timeRange = [];
-  handleSearch(); // 重置后重新查询
+  page.pageNum = 1; // 重置页码
+  handleSearch();
 }
 
-// 页面加载时自动查询真实日志
+// 分页切换（核心：重新查询）
+function onPageChange({ pageNum, pageSize }) {
+  page.pageNum = pageNum;
+  page.pageSize = pageSize;
+  handleSearch(); // 切换分页后重新查询
+}
+
+// 页面加载时查询
 onMounted(() => {
   handleSearch();
 });
@@ -135,5 +159,10 @@ onMounted(() => {
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.pagination-wrap {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

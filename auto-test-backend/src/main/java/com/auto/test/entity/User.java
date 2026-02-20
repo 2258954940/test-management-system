@@ -3,6 +3,8 @@ package com.auto.test.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
 
@@ -14,6 +16,8 @@ public class User {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    @NotBlank(message = "用户名不能为空")
+    @Size(min = 2, message = "用户名长度不能小于2")
     private String username;
     private String password;
     private String role;
