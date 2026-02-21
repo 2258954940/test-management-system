@@ -124,7 +124,7 @@
           <el-input
             v-model="formModel.creator"
             placeholder="请输入创建人"
-            :disabled="isEdit"
+            disabled
           />
         </el-form-item>
         <!-- 新增：登录相关配置 -->
@@ -453,10 +453,11 @@ const getSiteNameByCode = (siteCode) => {
   return site?.siteName || siteCode;
 };
 
+// 获取当前登录用户（优先级：store > localStorage）
 function getDefaultCreator() {
   const store = useUserStore();
   if (store?.username) return store.username;
-  return localStorage.getItem("username") || "";
+  return localStorage.getItem("username") || "未知用户";
 }
 
 async function fetchCaseList() {
@@ -556,7 +557,7 @@ const formRules = {
   name: [{ required: true, message: "请输入用例名称", trigger: "blur" }],
   url: [{ required: true, message: "请输入测试URL", trigger: "blur" }],
   description: [{ required: true, message: "请输入用例步骤", trigger: "blur" }],
-  creator: [{ required: true, message: "请输入创建人", trigger: "blur" }],
+  creator: [{ required: true, message: "创建人不能为空", trigger: "blur" }],
   inputData: [
     { required: true, message: "请输入要填写的内容", trigger: "blur" },
   ],
@@ -636,7 +637,7 @@ function openAdd() {
   formModel.name = "";
   formModel.url = "";
   formModel.description = "";
-  formModel.creator = "admin";
+  formModel.creator = getDefaultCreator(); // 核心修改：自动填充当前登录用户
   formModel.inputData = "";
   formModel.expectedResult = "";
   formModel.elementIds = [];
@@ -662,7 +663,7 @@ function openEdit(row) {
   formModel.name = row.name || "";
   formModel.url = row.url || "";
   formModel.description = row.description || "";
-  formModel.creator = row.creator || "admin";
+  formModel.creator = row.creator || getDefaultCreator(); // 核心修改：用原创建人，无则取当前用户
   formModel.inputData = row.inputData || "";
   formModel.expectedResult = row.expectedResult || "";
   formModel.elementIds = row.elementIds
@@ -813,10 +814,7 @@ async function handleSubmit() {
       await updateCase(submitData);
       ElMessage.success("编辑用例成功");
     } else {
-      await addCase({
-        ...submitData,
-        creator: submitData.creator || getDefaultCreator(),
-      });
+      await addCase(submitData); // 无需再手动赋值creator，已经提前填充
       ElMessage.success("新增用例成功");
     }
     dialogVisible.value = false;
