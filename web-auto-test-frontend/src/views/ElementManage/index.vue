@@ -276,7 +276,6 @@ function handleSearch(params) {
   filter.pageUrl = params.pageUrl || "";
   filter.widgetType = params.widgetType || "";
   pageParams.pageNum = 1;
-  fetchElementList();
 }
 
 // 重置
@@ -285,14 +284,12 @@ function handleReset() {
   filter.pageUrl = "";
   filter.widgetType = "";
   pageParams.pageNum = 1;
-  fetchElementList();
 }
 
 // 分页切换
 function onPageChange({ pageNum, pageSize }) {
   pageParams.pageNum = pageNum;
   pageParams.pageSize = pageSize;
-  fetchElementList();
 }
 
 // 新增/编辑弹窗

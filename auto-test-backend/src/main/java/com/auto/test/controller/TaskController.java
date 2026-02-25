@@ -290,7 +290,7 @@ public class TaskController {
 
         // 4. 提取用户名（索引3）
         String realUsername = tokenParts[3];
-        System.out.println("TaskController解析出的用户名：" + realUsername); // 调试用
+        // System.out.println("TaskController解析出的用户名：" + realUsername); // 调试用
 
         // 5. 校验用户是否存在
         User user = userService.getByUsername(realUsername);

@@ -84,7 +84,14 @@ public class TestCaseService {
     }
 
     public TestResult runTestCase(Long caseId) {
-        SiteTestConfigDO defaultConfig = siteTestConfigService.getBySiteCode("BAIDU");
+        // 修复：先获取用例，再根据用例的site_code获取配置
+        TestCase testCase = testCaseMapper.findById(caseId);
+        if (testCase == null) {
+            throw new IllegalArgumentException("用例不存在，ID=" + caseId);
+        }
+        // 优先使用用例的site_code，无则默认BAIDU
+        String siteCode = testCase.getSiteCode() != null ? testCase.getSiteCode() : "BAIDU";
+        SiteTestConfigDO defaultConfig = siteTestConfigService.getBySiteCode(siteCode);
         return runTestCase(caseId, defaultConfig, false, "", "", "", "edge", null);
     }
 
@@ -116,6 +123,17 @@ public class TestCaseService {
         TestCase testCase = testCaseMapper.findById(caseId);
         if (testCase == null) {
             throw new IllegalArgumentException("用例不存在，ID=" + caseId);
+        }
+
+        // 修复：如果传入的siteConfig为空，根据用例的site_code动态获取
+        if (siteConfig == null) {
+            String siteCode = testCase.getSiteCode();
+            if (siteCode != null && !siteCode.isEmpty()) {
+                siteConfig = siteTestConfigService.getBySiteCode(siteCode);
+            } else {
+                // 兜底：无配置时默认使用BAIDU
+                siteConfig = siteTestConfigService.getBySiteCode("BAIDU");
+            }
         }
 
         TestResult result = new TestResult();
@@ -159,7 +177,7 @@ public class TestCaseService {
                 String actualUrl = driver.getCurrentUrl();
                 String actualTitle = driver.getTitle();
                 log.info("[调试-页面信息] 实际访问URL：{}，预期URL：{}", actualUrl, testCase.getUrl());
-                log.info("[调试-页面信息] 实际页面标题：{}，预期标题：百度一下，你就知道", actualTitle);
+                log.info("[调试-页面信息] 实际页面标题：{}，预期标题：{}", actualTitle, siteConfig != null ? siteConfig.getSiteName() : "无");
 
                 Boolean isKwExist = (Boolean) ((JavascriptExecutor) driver).executeScript(
                         "return document.getElementById('kw') !== null;"
@@ -186,7 +204,8 @@ public class TestCaseService {
                 if (elementIds != null && !elementIds.trim().isEmpty()) {
                     String[] elementIdArray = elementIds.split(",");
                     log.info("[元素解析] 共{}个元素待处理：{}", elementIdArray.length, Arrays.toString(elementIdArray));
-
+                    int i = 0;
+                    int dataIndex = 0;
                     for (String elementIdStr : elementIdArray) {
                         Long elementId = Long.parseLong(elementIdStr.trim());
                         Element element = elementMapper.findById(elementId);
@@ -214,38 +233,39 @@ public class TestCaseService {
                             }
                         };
 
-                        WebElement webElement = null;
-                        try {
-                            log.info("[调试-定位开始] 等待元素{}可见（定位方式：{}={}）", element.getElementName(), element.getLocatorType(), element.getLocatorValue());
+                            WebElement webElement = null;
                             try {
-                                webElement = new WebDriverWait(driver, Duration.ofSeconds(5))
-                                        .until(ExpectedConditions.visibilityOfElementLocated(by));
-                            } catch (TimeoutException visibleEx) {
-                                log.warn("[元素可见等待超时] 改用presence定位：{}", element.getElementName());
-                            }
-
-                            if (webElement == null) {
-                                webElement = new WebDriverWait(driver, Duration.ofSeconds(5))
+                                log.info("[调试-定位开始] 等待元素{}存在（定位方式：{}={}）", element.getElementName(), element.getLocatorType(), element.getLocatorValue());
+                                // 第一步：等待元素存在（presence）- 基础条件
+                                WebElement tempElement = new WebDriverWait(driver, Duration.ofSeconds(15))
                                         .until(ExpectedConditions.presenceOfElementLocated(by));
-                            }
 
-                            try {
-                                webElement = new WebDriverWait(driver, Duration.ofSeconds(3))
-                                        .until(ExpectedConditions.elementToBeClickable(by));
-                            } catch (TimeoutException clickableEx) {
-                                log.warn("[元素可点击等待超时] 将继续使用已定位元素执行动作：{}", element.getElementName());
-                            }
+                                try {
+                                    // 第二步：优先等待元素可见（visibility）- 宽松条件，超时不抛异常
+                                    webElement = new WebDriverWait(driver, Duration.ofSeconds(5))
+                                            .until(ExpectedConditions.visibilityOfElementLocated(by));
+                                    log.info("[元素定位成功-可见] ID={}, 名称={}", elementId, element.getElementName());
+                                } catch (TimeoutException e) {
+                                    // 兜底：元素存在但不可见时，直接使用存在的元素
+                                    webElement = tempElement;
+                                    log.warn("[元素定位-可见性超时] ID={}, 名称={}，使用存在但可能不可见的元素继续执行", elementId, element.getElementName());
+                                    
+                                    // 强制滚动到元素位置并尝试激活
+                                    ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", webElement);
+                                    Thread.sleep(800);
+                                    
+                                    // 强制设置元素可见（JS兜底）
+                                    ((JavascriptExecutor) driver).executeScript("arguments[0].style.display = 'block'; arguments[0].style.visibility = 'visible';", webElement);
+                                }
 
-                            log.info("[元素定位成功] ID={}, 名称={}", elementId, element.getElementName());
-
-                            String elementTag = webElement.getTagName();
-                            String elementIdAttr = webElement.getAttribute("id");
-                            String elementNameAttr = webElement.getAttribute("name");
-                            Boolean elementDisplayed = webElement.isDisplayed();
-                            Boolean elementEnabled = webElement.isEnabled();
-                            log.info("[调试-元素详情] 标签名：{}，id属性：{}，name属性：{}，是否可见：{}，是否可用：{}",
-                                    elementTag, elementIdAttr, elementNameAttr, elementDisplayed, elementEnabled);
-
+                                // 补充元素状态日志
+                                String elementTag = webElement.getTagName();
+                                String elementIdAttr = webElement.getAttribute("id");
+                                String elementNameAttr = webElement.getAttribute("name");
+                                Boolean elementDisplayed = webElement.isDisplayed();
+                                Boolean elementEnabled = webElement.isEnabled();
+                                log.info("[调试-元素详情] 标签名：{}，id属性：{}，name属性：{}，是否可见：{}，是否可用：{}",
+                                        elementTag, elementIdAttr, elementNameAttr, elementDisplayed, elementEnabled);
                         } catch (TimeoutException | NoSuchElementException ex) {
                             String errMsg = "元素定位超时/不存在：" + element.getLocatorType() + "=" + element.getLocatorValue();
                             log.error(errMsg, ex);
@@ -255,7 +275,7 @@ public class TestCaseService {
                         }
 
                         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", webElement);
-                        Thread.sleep(500);
+                        Thread.sleep(400);
 
                         String actionType = switch (element.getWidgetType().toLowerCase()) {
                             case "input" -> "input";
@@ -272,9 +292,23 @@ public class TestCaseService {
                         }
 
                         try {
-                            SeleniumUtil.performAction(driver, webElement, actionType, testCase.getInputData());
-                            log.info("[动作执行完成] {} - 执行{}操作", element.getElementName(), actionType);
-                            verifyDetail.put("元素动作-" + element.getElementName(), "成功：执行" + actionType + "操作");
+                            String[] inputDataArray = testCase.getInputData() != null ? testCase.getInputData().split(",") : new String[0];
+                            String currentInputData = "";
+                            boolean isInputWidget = "input".equalsIgnoreCase(element.getWidgetType());
+                            boolean shouldUseInputData = isInputWidget && "input".equalsIgnoreCase(actionType);
+
+                            if (shouldUseInputData && dataIndex < inputDataArray.length) {
+                                currentInputData = inputDataArray[dataIndex].trim();
+                            }
+
+                            // 执行动作时传入当前元素对应的输入数据（仅input消耗数据）
+                            SeleniumUtil.performAction(driver, webElement, actionType, currentInputData);
+                            log.info("[动作执行完成] {} - 执行{}操作，输入数据：{}", element.getElementName(), actionType, currentInputData);
+                            verifyDetail.put("元素动作-" + element.getElementName(), "成功：执行" + actionType + "操作，输入：" + currentInputData);
+
+                            if (shouldUseInputData) {
+                                dataIndex++;
+                            }
                         } catch (Exception e) {
                             String errMsg = "元素动作执行失败：" + element.getElementName() + "，动作类型=" + actionType;
                             log.error(errMsg, e);
@@ -283,7 +317,9 @@ public class TestCaseService {
                             throw new RuntimeException(errMsg, e);
                         }
 
-                        if ("input".equals(element.getWidgetType().toLowerCase())) {
+                        // 仅搜索类输入框才自动触发回车和窗口切换，普通表单输入不再触发
+                        if ("input".equals(element.getWidgetType().toLowerCase())
+                                && "SEARCH".equalsIgnoreCase(testCase.getAssertType())) {
                             try {
                                 SeleniumUtil.performAction(driver, webElement, "enter", null);
                                 log.info("[触发回车] {} - 输入后按回车键完成搜索", element.getElementName());
@@ -321,7 +357,8 @@ public class TestCaseService {
                                 verifyDetail.put("窗口切换", "失败：" + errMsg);
                             }
                         }
-                        Thread.sleep(500);
+                        Thread.sleep(400);
+                        i++;
                     }
                 } else {
                     log.warn("[元素关联] 用例未绑定任何元素，仅加载页面");
@@ -431,7 +468,6 @@ public class TestCaseService {
         int retrySuccess = 0;
         int retryCount = 1;
         WebDriver driver = null;
-        SiteTestConfigDO defaultConfig = siteTestConfigService.getBySiteCode("BAIDU");
 
         try {
             log.info("【批量执行开始】总用例数={}，执行浏览器={}，失败重试次数={}", total, browserType, retryCount);
@@ -445,8 +481,16 @@ public class TestCaseService {
 
                 for (int i = 0; i <= retryCount; i++) {
                     try {
+                        // 修复：根据每个用例的site_code获取对应配置
+                        TestCase testCase = testCaseMapper.findById(caseId);
+                        if (testCase == null) {
+                            throw new IllegalArgumentException("用例不存在，ID=" + caseId);
+                        }
+                        String siteCode = testCase.getSiteCode() != null ? testCase.getSiteCode() : "BAIDU";
+                        SiteTestConfigDO siteConfig = siteTestConfigService.getBySiteCode(siteCode);
+
                         TestResult testResult = this.runTestCase(
-                                caseId, defaultConfig, false, "", "", "", taskId, driver
+                                caseId, siteConfig, false, "", "", "", taskId, driver
                         );
                         if ("PASS".equals(testResult.getStatus())) {
                             isExecuteSuccess = true;

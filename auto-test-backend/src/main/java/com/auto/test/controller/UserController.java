@@ -324,8 +324,8 @@ private String getRealUsernameFromToken(String token) {
 
     // 正确截取用户名：第4个元素（索引3）
     String realUsername = tokenParts[3];
-    // 打印日志（方便你调试，可选）
-    System.out.println("解析出的用户名：" + realUsername);
+    // // 打印日志（方便调试）
+    // System.out.println("解析出的用户名：" + realUsername);
 
     // 第三步：校验用户名是否存在
     User user = userService.getByUsername(realUsername);

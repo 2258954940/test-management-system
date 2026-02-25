@@ -261,7 +261,7 @@ public class TestCaseController {
         }
 
         String realUsername = tokenParts[3];
-        System.out.println("TestCaseController解析出的用户名：" + realUsername);
+        // System.out.println("TestCaseController解析出的用户名：" + realUsername);//调试日志
 
         User user = userService.getByUsername(realUsername);
         if (user == null) {

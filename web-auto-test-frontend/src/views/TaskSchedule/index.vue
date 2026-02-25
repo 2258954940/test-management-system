@@ -346,6 +346,8 @@ function statusTag(s) {
 }
 
 // 创建任务
+// 创建任务
+// 创建任务
 async function createTask() {
   // 表单校验
   if (!taskForm.taskName.trim()) {
@@ -362,7 +364,7 @@ async function createTask() {
   }
 
   try {
-    // 提交创建任务
+    // 1. 提交创建任务，拿到返回的新任务ID
     const createRes = await apiCreateTask({
       taskName: taskForm.taskName.trim(),
       caseIds: taskForm.caseIds.join(","),
@@ -371,30 +373,25 @@ async function createTask() {
     });
     const newTaskId = createRes.data?.id;
 
-    // 容错处理
-    if (!newTaskId) {
-      ElMessage.warning("任务创建成功，但未获取到任务ID，需手动执行");
-      resetTaskForm();
-      await loadTasks();
-      return;
-    }
-
     ElMessage.success("任务创建成功！");
 
-    // 立即执行任务
-    if (taskForm.executeType === "immediate") {
+    // 2. 立即执行：必须拿到 newTaskId 才调用执行接口
+    if (taskForm.executeType === "immediate" && newTaskId) {
       await apiRunTask(newTaskId);
       ElMessage.success("立即执行任务已触发！");
+    } else if (taskForm.executeType === "immediate" && !newTaskId) {
+      ElMessage.warning("任务创建成功，但未获取到任务ID，无法自动执行");
     }
 
-    // 重置表单+刷新列表
+    // 3. 重置表单 + 刷新列表（加延迟确保后端数据已落库）
     resetTaskForm();
-    await loadTasks();
+    setTimeout(async () => {
+      await loadTasks();
+    }, 500);
   } catch (err) {
     ElMessage.error(`创建任务失败：${err.message || "未知错误"}`);
   }
 }
-
 // 重置任务表单
 function resetTaskForm() {
   taskForm.taskName = "";
