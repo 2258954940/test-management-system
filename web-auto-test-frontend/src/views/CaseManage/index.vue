@@ -28,23 +28,6 @@
           min-width="200"
           show-overflow-tooltip
         />
-        <el-table-column prop="needLogin" label="是否需要登录" width="100">
-          <template #default="{ row }">
-            <el-tag size="small" :type="row.needLogin ? 'success' : 'info'">
-              {{ row.needLogin ? "是" : "否" }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="siteCode"
-          label="关联网站"
-          width="120"
-          show-overflow-tooltip
-        >
-          <template #default="{ row }">
-            {{ getSiteNameByCode(row.siteCode) || "-" }}
-          </template>
-        </el-table-column>
         <el-table-column prop="creator" label="创建人" width="120" />
         <el-table-column prop="createTime" label="创建时间" width="180">
           <template #default="{ row }">{{
@@ -108,6 +91,13 @@
             placeholder="请输入执行步骤（支持多行）"
           />
         </el-form-item>
+        <el-form-item label="执行浏览器">
+          <el-select v-model="formModel.browser" placeholder="请选择执行浏览器">
+            <el-option label="Edge" value="edge" />
+            <el-option label="Chrome" value="chrome" />
+            <el-option label="Firefox" value="firefox" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="输入数据" prop="inputData">
           <el-input
             v-model="formModel.inputData"
@@ -125,52 +115,6 @@
             v-model="formModel.creator"
             placeholder="请输入创建人"
             disabled
-          />
-        </el-form-item>
-        <!-- 新增：登录相关配置 -->
-        <el-form-item label="是否需要登录" prop="needLogin">
-          <el-switch
-            v-model="formModel.needLogin"
-            active-text="是"
-            inactive-text="否"
-          />
-        </el-form-item>
-        <el-form-item
-          label="关联测试网站"
-          prop="siteCode"
-          v-if="formModel.needLogin"
-        >
-          <el-select v-model="formModel.siteCode" placeholder="请选择测试网站">
-            <el-option
-              v-for="config in siteConfigs"
-              :key="config.siteCode"
-              :label="config.siteName"
-              :value="config.siteCode"
-            ></el-option>
-          </el-select>
-        </el-form-item>
-        <!-- 新增：测试账号输入框 -->
-        <el-form-item
-          label="测试账号"
-          prop="testAccount"
-          v-if="formModel.needLogin"
-        >
-          <el-input
-            v-model="formModel.testAccount"
-            placeholder="请输入测试账号（执行时自动填充）"
-          />
-        </el-form-item>
-        <!-- 新增：测试密码输入框 -->
-        <el-form-item
-          label="测试密码"
-          prop="testPassword"
-          v-if="formModel.needLogin"
-        >
-          <el-input
-            v-model="formModel.testPassword"
-            type="password"
-            placeholder="请输入测试密码（执行时自动填充）"
-            show-password
           />
         </el-form-item>
         <!-- 断言配置字段 -->
@@ -235,11 +179,11 @@
       </template>
     </el-dialog>
 
-    <!-- 执行用例弹窗（自动回填保存的账号密码） -->
+    <!-- 执行用例弹窗 -->
     <el-dialog
       v-model="runCaseDialogVisible"
       title="执行用例"
-      width="500px"
+      width="400px"
       style="z-index: 9999"
     >
       <el-form
@@ -251,7 +195,6 @@
         <el-form-item label="用例ID" prop="caseId">
           <el-input v-model="runCaseForm.caseId" disabled />
         </el-form-item>
-        <!-- 新增：浏览器选择，默认Edge -->
         <el-form-item label="浏览器" prop="browserType">
           <el-select
             v-model="runCaseForm.browserType"
@@ -261,29 +204,6 @@
             <el-option label="Chrome" value="chrome" />
             <el-option label="Firefox" value="firefox" />
           </el-select>
-        </el-form-item>
-        <!-- 仅当用例需要登录时显示账号密码（自动回填） -->
-        <el-form-item
-          label="测试账号"
-          prop="username"
-          v-if="currentCase.needLogin"
-        >
-          <el-input
-            v-model="runCaseForm.username"
-            placeholder="留空则使用用例中保存的账号"
-          />
-        </el-form-item>
-        <el-form-item
-          label="测试密码"
-          prop="password"
-          v-if="currentCase.needLogin"
-        >
-          <el-input
-            v-model="runCaseForm.password"
-            type="password"
-            placeholder="留空则使用用例中保存的密码"
-            show-password
-          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -324,11 +244,9 @@ import {
   getCaseList,
   updateCase,
   runCase,
-  getCaseById, // 新增：获取单个用例详情
 } from "@/api/case";
 import { useUserStore } from "@/store";
 import { getElementList } from "@/api/element";
-import { getSiteConfigs } from "@/api/siteConfig";
 
 const tableWrap = ref(null);
 let resizeObserver = null;
@@ -352,16 +270,10 @@ const caseList = ref([]);
 const loading = ref(false);
 const submitLoading = ref(false);
 const elementList = ref([]);
-const siteConfigs = ref([]);
 
-// 当前选中的用例（用于执行弹窗）
 const currentCase = reactive({
   id: "",
-  needLogin: false,
-  siteCode: "",
   assertExpectedValue: "",
-  testAccount: "", // 新增：保存的测试账号
-  testPassword: "", // 新增：保存的测试密码
 });
 
 // 执行用例相关
@@ -370,31 +282,10 @@ const runCaseLoading = ref(false);
 const runCaseFormRef = ref(null);
 const runCaseForm = reactive({
   caseId: "",
-  username: "",
-  password: "",
-  browserType: "edge", // 新增：浏览器选择，默认Edge
+  browserType: "edge",
 });
 
-// 执行用例表单规则（修改：账号密码改为非必填）
-const runCaseRules = reactive({
-  browserType: [
-    { required: true, message: "请选择执行用例的浏览器", trigger: "change" },
-  ],
-  username: [
-    {
-      required: false, // 修改：非必填
-      message: "请输入测试账号",
-      trigger: "blur",
-    },
-  ],
-  password: [
-    {
-      required: false, // 修改：非必填
-      message: "请输入测试密码",
-      trigger: "blur",
-    },
-  ],
-});
+const runCaseRules = reactive({});
 
 // 验证详情
 const verifyDetailDialogVisible = ref(false);
@@ -446,13 +337,6 @@ const displayList = computed(() => {
   return filteredList.value.slice(start, start + pageParams.pageSize);
 });
 
-// 根据网站编码获取网站名称
-const getSiteNameByCode = (siteCode) => {
-  if (!siteCode) return "";
-  const site = siteConfigs.value.find((item) => item.siteCode === siteCode);
-  return site?.siteName || siteCode;
-};
-
 // 获取当前登录用户（优先级：store > localStorage）
 function getDefaultCreator() {
   const store = useUserStore();
@@ -471,6 +355,8 @@ async function fetchCaseList() {
       : Array.isArray(res?.data)
       ? res.data
       : [];
+    console.log("列表数据：", list);
+
     caseList.value = list;
     pageParams.total = filteredList.value.length;
   } catch (err) {
@@ -493,20 +379,6 @@ async function fetchElementList() {
       "加载元素列表失败";
     ElMessage.error(`加载元素列表失败：${errMsg}`);
     elementList.value = [];
-  }
-}
-
-async function fetchSiteConfigs() {
-  try {
-    const res = await getSiteConfigs();
-    siteConfigs.value = res.data || res || [];
-  } catch (err) {
-    const errMsg =
-      err?.response?.data?.msg ||
-      err?.response?.statusText ||
-      "加载网站配置失败";
-    ElMessage.error(`加载网站配置失败：${errMsg}`);
-    siteConfigs.value = [];
   }
 }
 
@@ -546,11 +418,7 @@ const formModel = reactive({
   assertLocatorType: "id",
   assertLocatorValue: "",
   assertExpectedValue: "",
-  // 登录相关配置
-  needLogin: false,
-  siteCode: "",
-  testAccount: "", // 新增：测试账号
-  testPassword: "", // 新增：测试密码
+  browser: "edge",
 });
 
 const formRules = {
@@ -587,46 +455,6 @@ const formRules = {
       },
     },
   ],
-  siteCode: [
-    {
-      required: true,
-      message: "请选择关联测试网站",
-      trigger: "change",
-      validator: (rule, value, callback) => {
-        if (formModel.needLogin && !value) {
-          callback(new Error(rule.message));
-        } else {
-          callback();
-        }
-      },
-    },
-  ],
-  testAccount: [
-    {
-      required: false, // 非必填（但建议填写）
-      message: "请输入测试账号",
-      trigger: "blur",
-      validator: (rule, value, callback) => {
-        if (formModel.needLogin && !value) {
-          ElMessage.warning("建议填写测试账号，执行时需手动输入");
-        }
-        callback();
-      },
-    },
-  ],
-  testPassword: [
-    {
-      required: false, // 非必填（但建议填写）
-      message: "请输入测试密码",
-      trigger: "blur",
-      validator: (rule, value, callback) => {
-        if (formModel.needLogin && !value) {
-          ElMessage.warning("建议填写测试密码，执行时需手动输入");
-        }
-        callback();
-      },
-    },
-  ],
 };
 
 const dialogTitle = computed(() => (isEdit.value ? "编辑用例" : "新增用例"));
@@ -637,20 +465,15 @@ function openAdd() {
   formModel.name = "";
   formModel.url = "";
   formModel.description = "";
-  formModel.creator = getDefaultCreator(); // 核心修改：自动填充当前登录用户
+  formModel.creator = getDefaultCreator();
   formModel.inputData = "";
   formModel.expectedResult = "";
   formModel.elementIds = [];
-  // 初始化断言字段
   formModel.assertType = "TEXT";
   formModel.assertLocatorType = "id";
   formModel.assertLocatorValue = "";
   formModel.assertExpectedValue = "";
-  // 初始化登录配置
-  formModel.needLogin = false;
-  formModel.siteCode = "";
-  formModel.testAccount = ""; // 初始化测试账号
-  formModel.testPassword = ""; // 初始化测试密码
+  formModel.browser = "edge";
   dialogVisible.value = true;
   setTimeout(() => {
     if (formRef.value) formRef.value.clearValidate();
@@ -663,22 +486,17 @@ function openEdit(row) {
   formModel.name = row.name || "";
   formModel.url = row.url || "";
   formModel.description = row.description || "";
-  formModel.creator = row.creator || getDefaultCreator(); // 核心修改：用原创建人，无则取当前用户
+  formModel.creator = row.creator || getDefaultCreator();
   formModel.inputData = row.inputData || "";
   formModel.expectedResult = row.expectedResult || "";
   formModel.elementIds = row.elementIds
     ? row.elementIds.split(",").map((id) => Number(id))
     : [];
-  // 回显断言字段
   formModel.assertType = row.assertType || "TEXT";
   formModel.assertLocatorType = row.assertLocatorType || "id";
   formModel.assertLocatorValue = row.assertLocatorValue || "";
   formModel.assertExpectedValue = row.assertExpectedValue || "";
-  // 回显登录配置
-  formModel.needLogin = row.needLogin || false;
-  formModel.siteCode = row.siteCode || "";
-  formModel.testAccount = row.testAccount || ""; // 回显测试账号
-  formModel.testPassword = row.testPassword || ""; // 回显测试密码
+  formModel.browser = row.browser;
   dialogVisible.value = true;
   setTimeout(() => {
     if (formRef.value) formRef.value.clearValidate();
@@ -686,31 +504,11 @@ function openEdit(row) {
 }
 
 async function openRunCaseDialog(row) {
-  // 保存当前选中的用例信息
   currentCase.id = row.id;
-  currentCase.needLogin = row.needLogin || false;
-  currentCase.siteCode = row.siteCode || "";
   currentCase.assertExpectedValue = row.assertExpectedValue || "";
 
-  // 获取用例详情，拿到保存的账号密码
-  try {
-    const res = await getCaseById(row.id);
-    if (res.data) {
-      currentCase.testAccount = res.data.testAccount || "";
-      currentCase.testPassword = res.data.testPassword || "";
-    }
-  } catch (err) {
-    // 优化错误提示，只打印日志，不弹警告（避免用户困惑）
-    console.log("获取用例详情失败，使用列表数据：", err);
-    currentCase.testAccount = row.testAccount || "";
-    currentCase.testPassword = row.testPassword || "";
-  }
-
-  // 初始化执行表单（自动回填保存的账号密码）
   runCaseForm.caseId = row.id;
-  runCaseForm.username = currentCase.testAccount; // 自动回填账号
-  runCaseForm.password = currentCase.testPassword; // 自动回填密码
-  runCaseForm.browserType = "edge"; // 默认Edge
+  runCaseForm.browserType = row.browser;
 
   runCaseDialogVisible.value = true;
   setTimeout(() => {
@@ -731,18 +529,14 @@ async function handleRunCaseSubmit() {
   try {
     ElMessage.info(`正在执行用例ID: ${runCaseForm.caseId}`);
 
-    // 构造执行请求体（仅传必要字段）
     const requestData = {
       caseId: runCaseForm.caseId,
-      username: runCaseForm.username || currentCase.testAccount, // 优先用手动输入，没有则用保存的
-      password: runCaseForm.password || currentCase.testPassword, // 优先用手动输入，没有则用保存的
       browserType: runCaseForm.browserType,
     };
 
     const res = await runCase(requestData);
     console.log("执行结果：", res);
 
-    // 解析验证详情
     if (res.data?.verifyDetail) {
       try {
         const detailMap = JSON.parse(res.data.verifyDetail);
@@ -761,16 +555,11 @@ async function handleRunCaseSubmit() {
       }
     }
 
-    // 状态提示
     const execStatus = res.data?.status || "UNKNOWN";
     if (execStatus === "SUCCESS" || execStatus === "PASS") {
       ElMessage.success(`用例执行成功 ✅，状态：${execStatus}`);
     } else if (execStatus === "FAILED") {
-      ElMessage.error(
-        `用例执行失败 ❌，状态：${execStatus}（可查看后端日志或截图）`
-      );
-    } else if (execStatus === "UNKNOWN") {
-      ElMessage.warning(`用例执行完成（未验证结果），状态：${execStatus}`);
+      ElMessage.error(`用例执行失败 ❌，状态：${execStatus}`);
     } else {
       ElMessage.info(`用例执行完成，状态：${execStatus}`);
     }
@@ -789,7 +578,7 @@ async function handleSubmit() {
   try {
     await formRef.value.validate();
   } catch (err) {
-    ElMessage.error("请填写所有必填字段（用例名称/URL/步骤/创建人）");
+    ElMessage.error("请填写所有必填字段");
     return;
   }
 
@@ -798,23 +587,18 @@ async function handleSubmit() {
     const submitData = {
       ...formModel,
       elementIds: formModel.elementIds.join(",") || "",
-      // 传递断言字段
       assertType: formModel.assertType,
       assertLocatorType: formModel.assertLocatorType,
       assertLocatorValue: formModel.assertLocatorValue,
       assertExpectedValue: formModel.assertExpectedValue,
-      // 传递登录配置
-      needLogin: formModel.needLogin,
-      siteCode: formModel.siteCode,
-      testAccount: formModel.testAccount, // 新增：传递测试账号
-      testPassword: formModel.testPassword, // 新增：传递测试密码
+      browser: formModel.browser,
     };
 
     if (isEdit.value) {
       await updateCase(submitData);
       ElMessage.success("编辑用例成功");
     } else {
-      await addCase(submitData); // 无需再手动赋值creator，已经提前填充
+      await addCase(submitData);
       ElMessage.success("新增用例成功");
     }
     dialogVisible.value = false;
@@ -879,7 +663,6 @@ function destroyTableResizeObserver() {
 onMounted(() => {
   fetchCaseList();
   fetchElementList();
-  fetchSiteConfigs();
   initTableResizeObserver();
 });
 

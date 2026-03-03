@@ -346,8 +346,6 @@ function statusTag(s) {
 }
 
 // 创建任务
-// 创建任务
-// 创建任务
 async function createTask() {
   // 表单校验
   if (!taskForm.taskName.trim()) {

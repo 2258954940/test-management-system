@@ -71,6 +71,7 @@ public class TestCaseService {
         testCase.setAssertLocatorValue(request.getAssertLocatorValue() != null ? request.getAssertLocatorValue() : "");
         testCase.setAssertExpectedValue(request.getAssertExpectedValue() != null ? request.getAssertExpectedValue() : "");
 
+        testCase.setBrowser(request.getBrowser() != null ? request.getBrowser() : "edge");
         testCaseMapper.insertTestCase(testCase);
         return testCase;
     }
@@ -92,8 +93,8 @@ public class TestCaseService {
         // 优先使用用例的site_code，无则默认BAIDU
         String siteCode = testCase.getSiteCode() != null ? testCase.getSiteCode() : "BAIDU";
         SiteTestConfigDO defaultConfig = siteTestConfigService.getBySiteCode(siteCode);
-        return runTestCase(caseId, defaultConfig, false, "", "", "", "edge", null);
-    }
+        return runTestCase(caseId, defaultConfig, false, "", "", "", testCase.getBrowser(), null);   
+     }
 
     public TestResult runTestCase(Long caseId, SiteTestConfigDO siteConfig,
                                   boolean needLogin,
@@ -124,7 +125,18 @@ public class TestCaseService {
         if (testCase == null) {
             throw new IllegalArgumentException("用例不存在，ID=" + caseId);
         }
+        // if (needLogin) {
+        //     if (username == null || username.isBlank()) {
+        //         username = testCase.getTestAccount();
+        //     }
+        //     if (password == null || password.isBlank()) {
+        //         password = testCase.getTestPassword();
+        //     }
 
+        //     if (username == null || username.isBlank() || password == null || password.isBlank()) {
+        //         throw new RuntimeException("该用例需要登录，请配置测试账号和密码");
+        //     }
+        // }登录代码中已改为执行时输入账号密码，这里不再从用例读取默认账号密码，保持用例数据清洁。
         // 修复：如果传入的siteConfig为空，根据用例的site_code动态获取
         if (siteConfig == null) {
             String siteCode = testCase.getSiteCode();
@@ -155,18 +167,18 @@ public class TestCaseService {
             driver.manage().window().maximize();
             log.info("[浏览器已最大化] 确保所有元素可见");
 
-            if (needLogin && siteConfig != null && username != null && !username.isEmpty()) {
-                log.info("[登录流程开始] 目标网站：{}，账号：{}", siteConfig.getSiteName(), username);
-                Map<String, String> loginVerifyDetail = validateWithLoginUI(driver, siteConfig, username, password, expectedNickname);
-                verifyDetail.putAll(loginVerifyDetail);
-                for (String key : loginVerifyDetail.keySet()) {
-                    if (loginVerifyDetail.get(key).contains("失败")) {
-                        isAllPass = false;
-                        throw new RuntimeException("登录失败：" + loginVerifyDetail.get(key));
-                    }
-                }
-                log.info("[登录流程完成] caseId={} 登录成功", caseId);
-            }
+            // if (needLogin && siteConfig != null && username != null && !username.isEmpty()) {
+            //     log.info("[登录流程开始] 目标网站：{}，账号：{}", siteConfig.getSiteName(), username);
+            //     Map<String, String> loginVerifyDetail = validateWithLoginUI(driver, siteConfig, username, password, expectedNickname);
+            //     verifyDetail.putAll(loginVerifyDetail);
+            //     for (String key : loginVerifyDetail.keySet()) {
+            //         if (loginVerifyDetail.get(key).contains("失败")) {
+            //             isAllPass = false;
+            //             throw new RuntimeException("登录失败：" + loginVerifyDetail.get(key));
+            //         }
+            //     }
+            //     log.info("[登录流程完成] caseId={} 登录成功", caseId);
+            // }登录流程已改为单独接口，这里不再自动执行登录，保持用例执行的纯粹性和灵活性。
 
             if (testCase.getUrl() != null && !testCase.getUrl().isEmpty()) {
                 driver.get(testCase.getUrl());
@@ -632,6 +644,8 @@ public class TestCaseService {
         originalCase.setAssertLocatorType(request.getAssertLocatorType() != null ? request.getAssertLocatorType() : originalCase.getAssertLocatorType());
         originalCase.setAssertLocatorValue(request.getAssertLocatorValue() != null ? request.getAssertLocatorValue() : originalCase.getAssertLocatorValue());
         originalCase.setAssertExpectedValue(request.getAssertExpectedValue() != null ? request.getAssertExpectedValue() : originalCase.getAssertExpectedValue());
+
+        originalCase.setBrowser(request.getBrowser() != null ? request.getBrowser() : originalCase.getBrowser());
 
         testCaseMapper.updateTestCase(originalCase);
     }

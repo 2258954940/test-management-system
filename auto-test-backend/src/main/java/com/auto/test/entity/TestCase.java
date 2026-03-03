@@ -30,4 +30,5 @@ public class TestCase {
     // 时间字段
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    private String browser;  //默认浏览器类型（chrome/firefox/edge）
 }

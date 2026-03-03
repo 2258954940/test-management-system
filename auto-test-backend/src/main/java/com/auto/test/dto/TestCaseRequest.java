@@ -38,4 +38,5 @@ public class TestCaseRequest {
     private String assertLocatorValue;
     @NotBlank(message = "断言预期值不能为空（文本断言）")
     private String assertExpectedValue;
+    private String browser;  // 默认浏览器类型（chrome/firefox/edge）
 }

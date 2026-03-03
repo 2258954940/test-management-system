@@ -26,6 +26,7 @@ public interface TestCaseMapper {
             "#{inputData}, #{expectedResult}, #{creator}, #{elementIds}, " +
             "#{assertType}, #{assertLocatorType}, #{assertLocatorValue}, #{assertExpectedValue}, " +
             "#{needLogin}, #{siteCode}, #{testAccount}, #{testPassword}, " + // 新增：对应参数
+            "#{browser}, " + 
             "NOW(), NOW()" +
             ")")
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
@@ -37,6 +38,7 @@ public interface TestCaseMapper {
             "input_data, expected_result, creator, element_ids, " +
             "assert_type, assert_locator_type, assert_locator_value, assert_expected_value, " +
             "need_login, site_code, test_account, test_password, " + // 新增：查询账号密码
+            "browser, "+
             "create_time, update_time " +
             "FROM test_case WHERE id = #{id}")
     TestCase findById(Long id);
@@ -47,6 +49,7 @@ public interface TestCaseMapper {
             "input_data, expected_result, creator, element_ids, " +
             "assert_type, assert_locator_type, assert_locator_value, assert_expected_value, " +
             "need_login, site_code, test_account, test_password, " + // 新增：查询账号密码
+            "browser, " +
             "create_time, update_time " +
             "FROM test_case ORDER BY create_time DESC")
     List<TestCase> findAll();
@@ -61,6 +64,7 @@ public interface TestCaseMapper {
             "assert_locator_value=#{assertLocatorValue}, assert_expected_value=#{assertExpectedValue}, " +
             "need_login=#{needLogin}, site_code=#{siteCode}, " +
             "test_account=#{testAccount}, test_password=#{testPassword}, " + // 新增：更新账号密码
+            "browser=#{browser}, " +
             "update_time=NOW() " +
             "WHERE id=#{id}")
     int updateTestCase(TestCase testCase);

@@ -101,29 +101,29 @@ public class TestCaseController {
 
             String finalUsername = null;
             String finalPassword = null;
-            if (testCase.getNeedLogin()) {
-                if (StringUtils.hasText(testCase.getTestAccount())) {
-                    finalUsername = testCase.getTestAccount();
-                }
-                if (StringUtils.hasText(testCase.getTestPassword())) {
-                    finalPassword = testCase.getTestPassword();
-                }
-                if (StringUtils.hasText(request.getUsername())) {
-                    finalUsername = request.getUsername();
-                }
-                if (StringUtils.hasText(request.getPassword())) {
-                    finalPassword = request.getPassword();
-                }
-                if (!StringUtils.hasText(finalUsername)) {
-                    return ApiResponse.error("需要登录时，测试账号不能为空", null);
-                }
-                if (!StringUtils.hasText(finalPassword)) {
-                    return ApiResponse.error("需要登录时，测试密码不能为空", null);
-                }
-                if (testCase.getSiteCode() == null || testCase.getSiteCode().trim().isEmpty()) {
-                    return ApiResponse.error("用例配置了需要登录，但未关联测试网站", null);
-                }
-            }
+            // if (testCase.getNeedLogin()) {
+            //     if (StringUtils.hasText(testCase.getTestAccount())) {
+            //         finalUsername = testCase.getTestAccount();
+            //     }
+            //     if (StringUtils.hasText(testCase.getTestPassword())) {
+            //         finalPassword = testCase.getTestPassword();
+            //     }
+            //     if (StringUtils.hasText(request.getUsername())) {
+            //         finalUsername = request.getUsername();
+            //     }
+            //     if (StringUtils.hasText(request.getPassword())) {
+            //         finalPassword = request.getPassword();
+            //     }
+            //     if (!StringUtils.hasText(finalUsername)) {
+            //         return ApiResponse.error("需要登录时，测试账号不能为空", null);
+            //     }
+            //     if (!StringUtils.hasText(finalPassword)) {
+            //         return ApiResponse.error("需要登录时，测试密码不能为空", null);
+            //     }
+            //     if (testCase.getSiteCode() == null || testCase.getSiteCode().trim().isEmpty()) {
+            //         return ApiResponse.error("用例配置了需要登录，但未关联测试网站", null);
+            //     }
+            // }
 
             SiteTestConfigDO siteConfig = null;
             if (testCase.getNeedLogin()) {
