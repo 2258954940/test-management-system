@@ -169,6 +169,24 @@ function onMenuSelect(index) {
   font-weight: 600;
 }
 
+// 👇 1. 修改退出登录按钮样式
+.header-right {
+  :deep(.el-button) {
+    background-color: #00b42a; // 绿色背景
+    color: #ffffff !important; // 白色文字
+    border: none;
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background-color: #009624; // 深一点的绿色悬停
+      transform: scale(1.05);
+    }
+  }
+}
+
 .layout-body {
   display: flex;
   flex: 1;
