@@ -1,6 +1,6 @@
 <template>
   <div class="element-manage-root">
-    <el-tabs v-model:active-name="activeTab" class="tabs-root">
+    <el-tabs v-model="activeTab" class="tabs-root">
       <el-tab-pane label="元素列表" name="list">
         <div class="top-area">
           <common-query-form
@@ -151,7 +151,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from "vue";
+import { ref, reactive, computed, onMounted, onActivated, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import CommonQueryForm from "@/components/CommonQueryForm.vue";
 import CommonPagination from "@/components/CommonPagination.vue";
@@ -184,12 +184,8 @@ const queryFields = [
   {
     label: "所属页面",
     key: "pageUrl",
-    type: "select",
-    options: [
-      { label: "首页", value: "home" },
-      { label: "登录页", value: "login" },
-      { label: "订单页", value: "order" },
-    ],
+    type: "input",
+    placeholder: "请输入所属页面URL",
   },
   {
     label: "控件类型",
@@ -246,7 +242,11 @@ const filtered = computed(() => {
     const matchName = filter.elementName
       ? it.elementName.toLowerCase().includes(filter.elementName.toLowerCase())
       : true;
-    const matchPage = filter.pageUrl ? it.pageUrl === filter.pageUrl : true;
+    const matchPage = filter.pageUrl
+      ? (it.pageUrl || "")
+          .toLowerCase()
+          .includes(filter.pageUrl.toLowerCase().trim())
+      : true;
     const matchControl = filter.widgetType
       ? it.widgetType === filter.widgetType
       : true;
@@ -496,7 +496,13 @@ async function handleBatchImport() {
 
 // 页面加载时请求列表
 onMounted(() => {
+  activeTab.value = "list";
   fetchElementList();
+});
+
+// 组件被keep-alive缓存后再次激活时，默认切回元素列表
+onActivated(() => {
+  activeTab.value = "list";
 });
 </script>
 

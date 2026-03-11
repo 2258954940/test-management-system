@@ -1,6 +1,8 @@
 # ===================== 项目根目录 .gitignore 全局配置 =====================
 # 说明：此文件对整个test-management-system项目生效，子模块的.gitignore仅作为补充
-
+# 本地导出文件
+*.py
+*.txt
 # -------------------- 前端模块忽略 (web-auto-test-frontend) --------------------
 # 依赖包
 web-auto-test-frontend/node_modules/

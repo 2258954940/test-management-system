@@ -90,9 +90,11 @@ public class TestCaseService {
         if (testCase == null) {
             throw new IllegalArgumentException("用例不存在，ID=" + caseId);
         }
-        // 优先使用用例的site_code，无则默认BAIDU
-        String siteCode = testCase.getSiteCode() != null ? testCase.getSiteCode() : "BAIDU";
-        SiteTestConfigDO defaultConfig = siteTestConfigService.getBySiteCode(siteCode);
+        // 优先使用用例的site_code；未配置则不强制回落默认站点
+        SiteTestConfigDO defaultConfig = null;
+        if (testCase.getSiteCode() != null && !testCase.getSiteCode().isEmpty()) {
+            defaultConfig = siteTestConfigService.getBySiteCode(testCase.getSiteCode());
+        }
         return runTestCase(caseId, defaultConfig, false, "", "", "", testCase.getBrowser(), null);   
      }
 
@@ -142,9 +144,6 @@ public class TestCaseService {
             String siteCode = testCase.getSiteCode();
             if (siteCode != null && !siteCode.isEmpty()) {
                 siteConfig = siteTestConfigService.getBySiteCode(siteCode);
-            } else {
-                // 兜底：无配置时默认使用BAIDU
-                siteConfig = siteTestConfigService.getBySiteCode("BAIDU");
             }
         }
 
@@ -157,9 +156,8 @@ public class TestCaseService {
         boolean isAllPass = true;
 
         try {
-            log.info("【用例执行开始】caseId={}, 用例名称={}, 测试URL={}, 目标网站={}, 是否登录={}",
-                    caseId, testCase.getName(), testCase.getUrl(),
-                    siteConfig != null ? siteConfig.getSiteName() : "默认", needLogin);
+                log.info("【用例执行开始】caseId={}, 用例名称={}, 测试URL={}, 是否登录={}",
+                    caseId, testCase.getName(), testCase.getUrl(), needLogin);
 
             log.info("[驱动复用成功] 浏览器版本：{}",
                     ((HasCapabilities) driver).getCapabilities().getBrowserVersion());
@@ -189,7 +187,7 @@ public class TestCaseService {
                 String actualUrl = driver.getCurrentUrl();
                 String actualTitle = driver.getTitle();
                 log.info("[调试-页面信息] 实际访问URL：{}，预期URL：{}", actualUrl, testCase.getUrl());
-                log.info("[调试-页面信息] 实际页面标题：{}，预期标题：{}", actualTitle, siteConfig != null ? siteConfig.getSiteName() : "无");
+                // log.info("[调试-页面信息] 实际页面标题：{}", actualTitle);
 
                 Boolean isKwExist = (Boolean) ((JavascriptExecutor) driver).executeScript(
                         "return document.getElementById('kw') !== null;"
@@ -206,7 +204,11 @@ public class TestCaseService {
                     log.info("[调试-元素列表] 第{}个input：id={}, name={}, type={}", i + 1, inputId, inputName, inputType);
                 }
 
-                log.info("[页面加载完成] URL={}, 标题={}", testCase.getUrl(), driver.getTitle());
+                if (actualTitle == null || actualTitle.trim().isEmpty()) {
+                    log.info("[页面加载完成] URL={}", testCase.getUrl());
+                } else {
+                    log.info("[页面加载完成] URL={}, 标题={}", testCase.getUrl(), actualTitle);
+                }
 
                 // 移除硬编码等待 head_wrapper
                 new WebDriverWait(driver, Duration.ofSeconds(10)).until(webDriver ->

@@ -21,6 +21,18 @@ public class AssertUtil {
         By elementLocator = buildByLocator(locatorType, locatorValue);
         String expected = expectedValue == null ? "" : expectedValue.trim();
 
+        // 自动切换到最新打开的标签页
+        try {
+            String currentHandle = driver.getWindowHandle();
+            for (String handle : driver.getWindowHandles()) {
+                if (!handle.equals(currentHandle)) {
+                    driver.switchTo().window(handle);
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[AssertUtil] 切换到新标签页失败: " + e.getMessage());
+        }
+
         switch (assertType.toUpperCase()) {
             case "ELEMENT":
             case "EXISTS":

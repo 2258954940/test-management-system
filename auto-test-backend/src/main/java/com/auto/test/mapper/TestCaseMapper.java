@@ -15,20 +15,19 @@ import java.util.List;
 public interface TestCaseMapper {
 
     // 核心修改：INSERT 语句补充 测试账号密码 + 原有断言+登录相关字段
-    @Insert("INSERT INTO test_case(" +
-            "name, description, url, locator_type, locator_value, action_type, " +
-            "input_data, expected_result, creator, element_ids, " +
-            "assert_type, assert_locator_type, assert_locator_value, assert_expected_value, " +
-            "need_login, site_code, test_account, test_password, " + // 新增：测试账号密码字段
-            "create_time, update_time" +
-            ") VALUES(" +
-            "#{name}, #{description}, #{url}, #{locatorType}, #{locatorValue}, #{actionType}, " +
-            "#{inputData}, #{expectedResult}, #{creator}, #{elementIds}, " +
-            "#{assertType}, #{assertLocatorType}, #{assertLocatorValue}, #{assertExpectedValue}, " +
-            "#{needLogin}, #{siteCode}, #{testAccount}, #{testPassword}, " + // 新增：对应参数
-            "#{browser}, " + 
-            "NOW(), NOW()" +
-            ")")
+   @Insert("INSERT INTO test_case(" +
+        "name, description, url, locator_type, locator_value, action_type, " +
+        "input_data, expected_result, creator, element_ids, " +
+        "assert_type, assert_locator_type, assert_locator_value, assert_expected_value, " +
+        "need_login, site_code, test_account, test_password, browser, " +
+        "create_time, update_time" +
+        ") VALUES(" +
+        "#{name}, #{description}, #{url}, #{locatorType}, #{locatorValue}, #{actionType}, " +
+        "#{inputData}, #{expectedResult}, #{creator}, #{elementIds}, " +
+        "#{assertType}, #{assertLocatorType}, #{assertLocatorValue}, #{assertExpectedValue}, " +
+        "#{needLogin}, #{siteCode}, #{testAccount}, #{testPassword}, #{browser}, " +
+        "NOW(), NOW()" +
+        ")")
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     int insertTestCase(TestCase testCase);
 
