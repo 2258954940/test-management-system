@@ -76,7 +76,10 @@ public class SeleniumUtil {
                 case "firefox":
                     System.setProperty("webdriver.gecko.driver", firefoxDriverFullPath);
                     FirefoxOptions firefoxOptions = new FirefoxOptions();
+                    firefoxOptions.setBinary("F:\\quarkload\\Firefox\\firefox.exe");
                     firefoxOptions.addArguments("--start-maximized");
+                    firefoxOptions.addArguments("--no-sandbox");
+                    firefoxOptions.addArguments("--disable-dev-shm-usage");
                     webDriver = new FirefoxDriver(firefoxOptions);
                     break;
 
@@ -85,10 +88,23 @@ public class SeleniumUtil {
             }
 
             webDriver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(DEFAULT_WAIT_SECONDS));
+            bringBrowserToFront(webDriver);
             return webDriver;
         } catch (Exception ex) {
             ex.printStackTrace();
             throw new IllegalStateException("Driver初始化失败", ex);
+        }
+    }
+
+    private static void bringBrowserToFront(WebDriver driver) {
+        if (driver == null) return;
+        try {
+            driver.switchTo().window(driver.getWindowHandle());
+            driver.manage().window().maximize();
+            driver.manage().window().setPosition(new Point(0, 0));
+            ((JavascriptExecutor) driver).executeScript("window.focus();");
+        } catch (Exception e) {
+            System.out.println("[SeleniumUtil] 浏览器窗口置前失败：" + e.getMessage());
         }
     }
 
