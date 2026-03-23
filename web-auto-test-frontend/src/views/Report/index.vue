@@ -380,7 +380,11 @@ function updateCharts() {
         type: "pie",
         radius: ["40%", "70%"],
         avoidLabelOverlap: false,
-        label: { show: false },
+        label: {
+          show: true,
+          position: "outside",
+          formatter: "{b}: {d}%",
+        },
         emphasis: { label: { show: true, fontSize: 14, fontWeight: "bold" } },
         data: [
           { value: succ, name: "成功" },
